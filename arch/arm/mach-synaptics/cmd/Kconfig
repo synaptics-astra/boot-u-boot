@@ -36,4 +36,8 @@ config CMD_SYNA_FLASH
 	default y
 	bool "Enable Flash command for Synaptics plats"
 	depends on (SYNA_DWSPI || CADENCE_XSPI)
+
+config CMD_SYNA_SPI_BURNING
+	bool "Enable burning image to spi flash"
+	depends on MTD_NOR_FLASH
 endmenu

@@ -88,5 +88,6 @@ static inline int get_Klamath_leakage(void)
 	return -1;
 }
 #endif
+int syna_init_mtdparts(void);
 
 #endif
