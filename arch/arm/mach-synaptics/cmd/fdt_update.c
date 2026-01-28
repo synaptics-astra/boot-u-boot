@@ -66,14 +66,14 @@ static int setup_kernel_logo_param(char *bootargs)
 {
 	char __maybe_unused tmp_buf[128];
 
-	if (IS_ENABLED(CONFIG_SYNA_DISABLE_BOOTLOGO)) {
-		memset(tmp_buf, 0x0, sizeof(tmp_buf));
-		snprintf(tmp_buf, (sizeof(tmp_buf) - 1), "avio.kernel_logo_disable=1");
+	int ret_val = 0;
+
+	if (get_kernel_logo_param(tmp_buf)) {
 		strcat(bootargs, tmp_buf);
-		return 1;
-	} else {
-		return 0;
+		ret_val = 1;
 	}
+
+	return ret_val;
 }
 
 static int setup_fbcon_param(char *bootargs)
@@ -105,9 +105,6 @@ static void setup_cma_param(char *bootargs)
 }
 #endif
 
-#ifdef CONFIG_VIDEO_SYNA
-extern u32 get_fastlogo_status(void);
-
 static void setup_fastlogo_param(char *bootargs)
 {
 	char tmp_buf[128];
@@ -125,7 +122,6 @@ static void setup_fastlogo_param(char *bootargs)
 		strcat(bootargs, tmp_buf);
 	}
 }
-#endif
 
 static int setup_reserved_mem(void *fdt, struct mem_region *reserved_mem, int reserved_num)
 {
@@ -381,10 +377,8 @@ int setup_bootargs(void *fdt)
 	strcat(newbootargs, " ");
 #endif
 
-#ifdef CONFIG_VIDEO_SYNA
 	setup_fastlogo_param(newbootargs);
 	strcat(newbootargs, " ");
-#endif
 
 	if (setup_kernel_logo_param(newbootargs))
 		strcat(newbootargs, " ");

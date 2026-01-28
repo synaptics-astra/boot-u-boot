@@ -44,6 +44,7 @@
 #include "misc_syna.h"
 #include "fastboot_syna.h"
 #include "misc_syna.h"
+#include "syna_logo.h"
 #include <dm/uclass.h>
 #include <dm/device.h>
 #include <dm/ofnode.h>
@@ -74,8 +75,6 @@
 
 DECLARE_GLOBAL_DATA_PTR;
 
-static avio_fastlogo_info fastlogo_display_info;
-
 static struct udevice *backlight;
 
 #if defined(CONFIG_TARGET_MYNA2)
@@ -84,21 +83,7 @@ static struct udevice *video_bridge;
 
 struct ctfb_res_modes video_mode;
 
-u32 get_fastlogo_status(void)
-{
-	return fastlogo_display_info.fl_disp_info;
-}
-
 typedef struct cmd_tbl_s	cmd_tbl_t;
-
-/* Functional hook provided to set status manually
- * Usage: when dtbo env variable set, status can be set to 0
- * So that linux can bootup independent of u-boot
- */
-void set_fastlogo_status(bool status)
-{
-	fastlogo_display_info.u.status =  status;
-}
 
 int syna_parse_lcdc_dt(struct udevice *dev)
 {
@@ -671,6 +656,8 @@ static int syna_load_logo_push_frame(struct berlin_fb_priv *priv, int width,
 				     int height, int display_id)
 {
 	VBUF_INFO *p_vpp_buf;
+	UINT8 *p_read_buffer = NULL;
+	struct fl_logo_geometry_t *fl_header = NULL;
 	int ret;
 
 	/* Optee TA requirement, align p_vpp_buf memory to 4K bytes */
@@ -680,22 +667,41 @@ static int syna_load_logo_push_frame(struct berlin_fb_priv *priv, int width,
 
 	memset(p_vpp_buf, 0, sizeof(VBUF_INFO));
 
-	ret = syna_load_logo_info(width, height, p_vpp_buf, &fastlogo_display_info.u);
-	if (ret != 0) {
+	ret = syna_load_logo_info(width, height, &p_read_buffer, &fl_header,
+				  &fastlogo_display_info.u);
+	if (ret != 0 || !p_read_buffer || !fl_header) {
 		printf("Reading image from EMMC failed\n");
 		return ret;
 	}
 
+	p_vpp_buf->m_srcfmt = LOGO_SRC_FMT;
+	p_vpp_buf->m_bytes_per_pixel = (LOGO_SRC_FMT == SRCFMT_YUV422) ? 2 : 3;
+	p_vpp_buf->m_pbuf_start = p_read_buffer;
+	p_vpp_buf->m_content_width = fl_header->width;
+	p_vpp_buf->m_content_height = fl_header->height;
+	p_vpp_buf->m_buf_stride = fl_header->stride;
+	p_vpp_buf->m_buf_size = p_vpp_buf->m_buf_stride * p_vpp_buf->m_content_height;
+	p_vpp_buf->m_active_width = fl_header->width;
+	p_vpp_buf->m_active_height = fl_header->height;
+	p_vpp_buf->m_bits_per_pixel = p_vpp_buf->m_bytes_per_pixel * 8;
+	p_vpp_buf->m_order = 0;
+
 	flush_dcache_range((uintptr_t)p_vpp_buf,
 			   (uintptr_t)(((char *)p_vpp_buf) + sizeof(VBUF_INFO)));
 
-	ret = MV_VPP_Display_Frame(priv, p_vpp_buf, display_id, width, height);
-	if (ret) {
-		printf("Failed to display logo\n");
-		return ret;
+	/* Check if U-Boot logo should be displayed */
+	if (!IS_UBOOT_LOGO_DISABLED()) {
+		ret = MV_VPP_Display_Frame(priv, p_vpp_buf, display_id, width, height);
+		if (ret) {
+			printf("Failed to display logo\n");
+			return ret;
+		}
 	}
 
-	printf("Loading logo %dx%d on display %d\n", width, height, display_id);
+	debug("logo handling %dx%d on display %d (bootlogo: uboot_logo=%s, kernel_logo=%s)\n",
+	      width, height, display_id, IS_UBOOT_LOGO_DISABLED()  ? "disabled" : "enabled",
+	      IS_KERNEL_LOGO_DISABLED() ? "disabled" : "enabled");
+
 	return ret;
 }
 
@@ -709,7 +715,7 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 	struct udevice *dev;
 	int ret;
 
-	if (IS_ENABLED(CONFIG_SYNA_DISABLE_BOOTLOGO))
+	if (IS_UBOOT_LOGO_DISABLED() && IS_KERNEL_LOGO_DISABLED())
 		return 0;
 
 	/* Invoke the DTB overlay before video device probed */
@@ -737,8 +743,9 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 
 	MV_VPP_Enable_Interrupt(priv);
 
-	/* Update fastlogo status for smooth transition Handling */
-	fastlogo_display_info.u.status =  1;
+	/* Set status based on whether U-Boot initialized hardware by displaying logo */
+	if (!IS_UBOOT_LOGO_DISABLED())
+		fastlogo_display_info.u.status = 1;
 
 	ret = uclass_get_device(UCLASS_PANEL_BACKLIGHT, 0, &backlight);
 	if (!ret)

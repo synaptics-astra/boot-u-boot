@@ -51,6 +51,5 @@ int MV_VPP_Display_Frame(struct berlin_fb_priv *priv, VBUF_INFO *p_vpp_buf,
 			 int display, int width, int height);
 void MV_VPP_Stop(void);
 void MV_VPP_DeInit(struct berlin_fb_priv *priv);
-int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_INFO *fl_info);
 
 #endif

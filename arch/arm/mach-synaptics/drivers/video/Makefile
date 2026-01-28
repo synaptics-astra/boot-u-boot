@@ -13,6 +13,7 @@ PLATFORM_CPPFLAGS += -DVPP_ENABLE_INTERNAL_MEM_MGR
 
 PLATFORM_CPPFLAGS += -DVPP_ENABLE_FLUSH_CACHE
 
+PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/utils/fastlogo/
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/include
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/vpp_ca/include
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/vpp_ca/thinvpp_ca
@@ -92,7 +93,6 @@ PLATFORM_CPPFLAGS += $(B_CHIP_CFLAGS)
 
 obj-y += vpp_ca/thinvpp_ca/osal/source/OSAL_api.o
 obj-y += hal_vpp_wrap.o
-obj-y += load_logo.o
 obj-y += vpp_api.o
 obj-y += fb.o
 obj-y += fb_fdt_util.o

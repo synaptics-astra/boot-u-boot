@@ -28,13 +28,13 @@
 #include "tee_ca_vpp.h"
 #include "soc-syna.h"
 #include "com_type.h"
-#include "vpp_api.h"
 #include "vpp_cmd.h"
 #include "vpp_cfg.h"
 #include "avpll.h"
 #include "vpp_priv.h"
 #include "vbuf.h"
 #include "vpp.h"
+#include "syna_logo.h"
 #include <irq_func.h>
 #include <cpu_func.h>
 #include <malloc.h>
@@ -371,7 +371,7 @@ int MV_VPPOBJ_Config_Display(struct vpp_config_params *vpp_config_param)
 }
 
 int syna_get_display_modeinfo(struct berlin_fb_priv *priv, int *width,
-			      int *height, int display, avio_fastlogo_info *dispinfo)
+			      int *height, int display, union avio_fastlogo_info_u *dispinfo)
 {
 	RESOLUTION_INFO resinfo;
 

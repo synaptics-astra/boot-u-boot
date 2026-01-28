@@ -27,14 +27,8 @@
 
 #include "vpp_api.h"
 
-typedef enum {
-	DISPLAY_1,
-	DISPLAY_2,
-	MAX_NUM_DISPLAY
-} ENUM_DISPLAY_ID;
-
 int syna_get_display_modeinfo(struct berlin_fb_priv *priv, int *width,
-			      int *heigth, int display, avio_fastlogo_info *dispinfo);
+			      int *heigth, int display, union avio_fastlogo_info_u *dispinfo);
 void syna_lcdc_Enable_IRQ(int intrno);
 void syna_lcdc_Disable_IRQ(int intrno);
 int lcdc_push_frame(struct berlin_fb_priv *priv, VBUF_INFO *pVppBuf,

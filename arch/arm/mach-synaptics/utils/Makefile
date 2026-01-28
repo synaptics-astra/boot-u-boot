@@ -23,3 +23,8 @@
 #
 
 obj-$(CONFIG_ARCH_SYNAPTICS) += getopt.o
+
+obj-y += fastlogo/syna_logo.o
+CFLAGS_syna_logo.o := -I$(srctree)/arch/arm/mach-synaptics/include
+CFLAGS_syna_logo.o += -I$(srctree)/arch/arm/mach-synaptics/utils/fastlogo
+CFLAGS_syna_logo.o += -DCONFIG_GENX_ENABLE

@@ -109,7 +109,7 @@ int lcdc_push_frame(struct berlin_fb_priv *priv, VBUF_INFO *p_vpp_buf,
 }
 
 int syna_get_display_modeinfo(struct berlin_fb_priv *priv, int *width,
-			      int *height, int display, avio_fastlogo_info *dispinfo)
+			      int *height, int display, union avio_fastlogo_info_u *dispinfo)
 {
 	struct lcdc_config *lcdc_config_data;
 	PANEL_TIMING_INFO *pTimingInfo;

@@ -40,14 +40,16 @@ config PANEL_DTBO_PATH
 		Configures the rootfs path to find panel dtbo.
 
 config SYNA_DISABLE_BOOTLOGO
-	bool "Disable logo display from uboot and kernel"
-	default n
+	hex "Boot logo disable control (bit0=uboot, bit1=kernel)"
+	default 0x0
 	help
-	  Disable logo display in both uboot and kernel.
-	  Use this macro to disable logo in a production or usb
-	  image, where logo is not available because of missing
-	  eMMC/fastlogo.subimg. But display testing is rebuild
-	  only after linux bootup.
+		Bit 0: Disable U-Boot logo (0=show, 1=disable)
+		Bit 1: Disable Kernel logo (0=show, 1=disable)
+
+		0x0 = Show both logos (default)
+		0x1 = Disable U-Boot logo, show kernel logo
+		0x2 = Show U-Boot logo, disable kernel logo
+		0x3 = Disable both logos
 
 config SYNA_DISABLE_FBCON
 	bool "Disable FBCON in kernel"

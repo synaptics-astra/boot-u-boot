@@ -30,14 +30,8 @@
 
 #define	VPP_SUPPORT_SCALAR		1
 
-typedef enum {
-	DISPLAY_1,
-	DISPLAY_2,
-	MAX_NUM_DISPLAY
-} ENUM_DISPLAY_ID;
-
 int syna_get_display_modeinfo(struct berlin_fb_priv *priv, int *width,
-			      int *height, int display, avio_fastlogo_info *dispinfo);
+			      int *height, int display, union avio_fastlogo_info_u *dispinfo);
 
 int MV_VPPOBJ_SetFormat(struct vpp_config_params *vpp_config_param);
 int MV_VPPOBJ_Config_Display(struct vpp_config_params *vpp_config_param);

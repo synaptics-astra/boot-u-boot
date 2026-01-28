@@ -49,6 +49,8 @@ int get_mmc_part_by_name(int mmc_dev, const char *name);
 unsigned int get_max_malloc_size(void);
 
 u32 get_fastlogo_status(void);
+void set_fastlogo_status(bool status);
+int get_kernel_logo_param(char *fl_args);
 int get_fastlogo_addr(char *fl_args);
 
 #endif

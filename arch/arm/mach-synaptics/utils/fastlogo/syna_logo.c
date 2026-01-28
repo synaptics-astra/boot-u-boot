@@ -1,42 +1,41 @@
 // SPDX-License-Identifier: GPL-2.0+
-/*
- * Copyright (C) 2016~2024 Synaptics Incorporated. All rights reserved.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 or
- * later as published by the Free Software Foundation.
- *
- * INFORMATION CONTAINED IN THIS DOCUMENT IS PROVIDED "AS-IS," AND
- * SYNAPTICS EXPRESSLY DISCLAIMS ALL EXPRESS AND IMPLIED WARRANTIES,
- * INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE, AND ANY WARRANTIES OF NON-INFRINGEMENT OF ANY
- * INTELLECTUAL PROPERTY RIGHTS. IN NO EVENT SHALL SYNAPTICS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
- * CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH THE USE
- * OF THE INFORMATION CONTAINED IN THIS DOCUMENT, HOWEVER CAUSED AND
- * BASED ON ANY THEORY OF LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * NEGLIGENCE OR OTHER TORTIOUS ACTION, AND EVEN IF SYNAPTICS WAS
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. IF A TRIBUNAL OF
- * COMPETENT JURISDICTION DOES NOT PERMIT THE DISCLAIMER OF DIRECT
- * DAMAGES OR ANY OTHER DAMAGES, SYNAPTICS' TOTAL CUMULATIVE LIABILITY
- * TO ANY PARTY SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
+
+/* Copyright (C) 2016~2026 Synaptics Incorporated. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 or
+ * later as published by the Free Software Foundation.
+ *
+ * INFORMATION CONTAINED IN THIS DOCUMENT IS PROVIDED "AS-IS," AND
+ * SYNAPTICS EXPRESSLY DISCLAIMS ALL EXPRESS AND IMPLIED WARRANTIES,
+ * INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE, AND ANY WARRANTIES OF NON-INFRINGEMENT OF ANY
+ * INTELLECTUAL PROPERTY RIGHTS. IN NO EVENT SHALL SYNAPTICS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
+ * CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH THE USE
+ * OF THE INFORMATION CONTAINED IN THIS DOCUMENT, HOWEVER CAUSED AND
+ * BASED ON ANY THEORY OF LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, AND EVEN IF SYNAPTICS WAS
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. IF A TRIBUNAL OF
+ * COMPETENT JURISDICTION DOES NOT PERMIT THE DISCLAIMER OF DIRECT
+ * DAMAGES OR ANY OTHER DAMAGES, SYNAPTICS' TOTAL CUMULATIVE LIABILITY
+ * TO ANY PARTY SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
  */
 
 #include <linux/types.h>
 #include <cpu_func.h>
 #include <asm/cache.h>
 #include <stdlib.h>
-#include "vpp_api.h"
-#include "vbuf.h"
+#include <dm.h>
 #include "part_efi.h"
-#include "vdec_com.h"
 #include "mmc.h"
 #include "misc_syna.h"
-#include "OSAL_api.h"
 #include "fastboot_syna.h"
-#include "vpp_priv.h"
 #include "tee_client.h"
 #include "mem_init.h"
+#include "syna_logo.h"
+
+DECLARE_GLOBAL_DATA_PTR;
 
 #ifdef CONFIG_GENX_ENABLE
 #include "genimg.h"
@@ -53,6 +52,8 @@
 #define IMAGE_TYPE_FAST_LOGO    0x27
 #define MIN_FASTLOGO_IMG_SIZE   (0.5 * 1024 * 1024)
 #define MAX_FASTLOGO_IMG_SIZE   (64 * 1024 * 1024)
+
+union avio_fastlogo_info_u fastlogo_display_info;
 
 #ifndef CONFIG_GENX_ENABLE
 #define GENX_IMAGE_HEADER_FASTLOGO_SIZE		0
@@ -83,16 +84,9 @@ struct pt_info {
 typedef struct disk_partition disk_partition_t;
 
 typedef struct {
-	unsigned int offset;
-	unsigned int width;
-	unsigned int height;
-	unsigned int stride;
-} fastlogo_info_t;
-
-typedef struct {
 	unsigned int versionNum;
 	unsigned int logo_num;
-	fastlogo_info_t info[];
+	struct fl_logo_geometry_t info[];
 } fastlogo_header_t;
 
 static unsigned int syna_get_blksize(void)
@@ -117,7 +111,7 @@ static unsigned int syna_get_blksize(void)
 
 void *syna_emmc_read_from_offset(const char *partition_name, unsigned int offset,
 				 unsigned int size, void *buff,
-				 FASTLOGO_INFO *fastlogo_display_info)
+				 struct fastlogo_info_t *fastlogo_display_info)
 {
 	struct blk_desc *dev_desc;
 	disk_partition_t info;
@@ -155,9 +149,9 @@ void *syna_emmc_read_from_offset(const char *partition_name, unsigned int offset
 	return (buff + (offset % dev_desc->blksz));
 }
 
-static fastlogo_info_t *check_validate_logo(int width, int height, UINT8 *pHEADER)
+static struct fl_logo_geometry_t *check_validate_logo(int width, int height, u8 *p_header)
 {
-	fastlogo_header_t *fl_header_info = (fastlogo_header_t *)pHEADER;
+	fastlogo_header_t *fl_header_info = (fastlogo_header_t *)p_header;
 	int i;
 
 	for (i = 0; i < fl_header_info->logo_num; i++) {
@@ -186,7 +180,10 @@ static fastlogo_info_t *check_validate_logo(int width, int height, UINT8 *pHEADE
 	return NULL;
 }
 
-int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_INFO *fl_info)
+int syna_load_logo_info(int width, int height,
+			u8 **out_buffer,
+			struct fl_logo_geometry_t **out_header,
+			struct fastlogo_info_t *fl_info)
 {
 	int ret = -1;
 	unsigned char *buff = NULL;
@@ -199,8 +196,8 @@ int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_IN
 	u32 read_size, img_size, logo_size;
 
 	struct img_info *img_info;
-	fastlogo_info_t *fl_header;
-	UINT8 *read_buffer, *logo_buffer, *header, *logo_header = NULL;
+	struct fl_logo_geometry_t *fl_header;
+	u8 *read_buffer, *logo_buffer, *header, *logo_header = NULL;
 	int ab_mode;
 	const char *pt_name;
 
@@ -221,7 +218,7 @@ int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_IN
 	block_size = syna_get_blksize();
 	pad_size = block_size * 2;
 	total_header_size = GENX_IMAGE_HEADER_FASTLOGO_SIZE + LOGO_HEADER_SIZE + pad_size;
-	logo_header = (UINT8 *)malloc_ion_cacheable(total_header_size);
+	logo_header = (u8 *)malloc_ion_cacheable(total_header_size);
 
 	debug("fastlogo: logo partition name %s header-size:%d, [blk/pad]_size %d/%d\n",
 	      pt_name, total_header_size, block_size, pad_size);
@@ -287,7 +284,7 @@ int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_IN
 	       width, height, fl_header->width, fl_header->height);
 	logo_buffer = fl_header->offset + header;
 	logo_size = (fl_header->stride * fl_header->height) + pad_size;
-	read_buffer = (UINT8 *)malloc_ion_cacheable(logo_size);
+	read_buffer = (u8 *)malloc_ion_cacheable(logo_size);
 	flush_dcache_range((unsigned long)img_buff, (unsigned long)(img_buff + read_size));
 	memcpy(read_buffer, logo_buffer, logo_size);
 
@@ -297,18 +294,10 @@ int syna_load_logo_info(int width, int height, VBUF_INFO *p_vpp_buf, FASTLOGO_IN
 	g_logo_info[g_logo_info_cnt].stride = fl_header->stride;
 	g_logo_info_cnt++;  /* Increment for next display */
 
-	p_vpp_buf->m_srcfmt = LOGO_SRC_FMT;
-	p_vpp_buf->m_bytes_per_pixel = (LOGO_SRC_FMT == SRCFMT_YUV422) ? 2 : 3;
-	p_vpp_buf->m_pbuf_start = read_buffer;
-	p_vpp_buf->m_content_width = fl_header->width;
-	p_vpp_buf->m_content_height = fl_header->height;
-	p_vpp_buf->m_buf_stride =  fl_header->stride;
-	p_vpp_buf->m_buf_size =  p_vpp_buf->m_buf_stride * p_vpp_buf->m_content_height;
-	p_vpp_buf->m_active_width = fl_header->width;
-	p_vpp_buf->m_active_height = fl_header->height;
-	//Indicate the bitdepth of the frame, if 8bit, is 8, if 10bit, is 10
-	p_vpp_buf->m_bits_per_pixel = p_vpp_buf->m_bytes_per_pixel * 8;
-	p_vpp_buf->m_order = 0;
+	if (out_buffer)
+		*out_buffer = read_buffer;
+	if (out_header)
+		*out_header = fl_header;
 
 error_out2:
 	if (img_buff)
@@ -320,9 +309,74 @@ error_out1:
 	return ret;
 }
 
+u32 get_fastlogo_status(void)
+{
+	return fastlogo_display_info.fl_disp_info;
+}
+
+/* Functional hook provided to set status manually
+ * Usage: when dtbo env variable set, status can be set to 0
+ * So that linux can bootup independent of u-boot
+ */
+void set_fastlogo_status(bool status)
+{
+	fastlogo_display_info.u.status =  status;
+}
+
+static void syna_load_default_logo_info(void)
+{
+	/* load the logo based on default details only if it is not populated by VIDEO module. */
+	if (g_logo_info_cnt == 0) {
+		const void *blob = gd->fdt_blob;
+		int offset, len;
+		const u32 *prop;
+		int panel_width = 0, panel_height = 0;
+		int hdmi_width = 1920, hdmi_height = 1080;  // Fallback defaults
+
+		/* Read HDMI resolution from DTS */
+		offset = fdt_path_offset(blob, "/soc/drm/hdmi_tx");
+		if (offset >= 0) {
+			prop = fdt_getprop(blob, offset, "frame-size-ndx", &len);
+			if (prop && len >= sizeof(u32) * 2) {
+				hdmi_width = fdt32_to_cpu(prop[0]);
+				hdmi_height = fdt32_to_cpu(prop[1]);
+			}
+		}
+
+		/* Load HDMI logo with DTS value or fallback */
+		if (syna_load_logo_info(hdmi_width, hdmi_height, NULL, NULL,
+					&fastlogo_display_info.u) == 0) {
+			debug("fastlogo: HDMI logo %dx%d loaded successfully\n",
+			      hdmi_width, hdmi_height);
+		}
+
+		/* Read DSI panel resolution from DTS */
+		offset = fdt_path_offset(blob, "/soc/drm/dsi_panel");
+		if (offset >= 0) {
+			prop = fdt_getprop(blob, offset, "ACTIVE_WIDTH", &len);
+			if (prop && len >= sizeof(u32))
+				panel_width = fdt32_to_cpu(prop[0]);
+
+			prop = fdt_getprop(blob, offset, "ACTIVE_HEIGHT", &len);
+			if (prop && len >= sizeof(u32))
+				panel_height = fdt32_to_cpu(prop[0]);
+		}
+
+		if (panel_width > 0 && panel_height > 0) {
+			if (syna_load_logo_info(panel_width, panel_height, NULL, NULL,
+						&fastlogo_display_info.u) == 0) {
+				debug("fastlogo: Panel logo loaded successfully\n");
+			}
+		}
+		fastlogo_display_info.u.status = 0;
+	}
+}
+
 int get_fastlogo_addr(char *fl_args)
 {
 	int i;
+
+	syna_load_default_logo_info();
 
 	fl_args[0] = '\0';
 	/* logo parameter: syna_drm.logo_info=addr0@w0xh0-s0,addr1@w1xh1-s1 */
@@ -335,9 +389,20 @@ int get_fastlogo_addr(char *fl_args)
 				 g_logo_info[i].height, g_logo_info[i].stride);
 
 			debug("U-Boot: Display[%d] logo: %08lx@%xx%x-%x\n",
-			      i, g_logo_info[i].addr, g_logo_info[i].width,
-			      g_logo_info[i].height, g_logo_info[i].stride);
+				i, g_logo_info[i].addr, g_logo_info[i].width,
+				g_logo_info[i].height, g_logo_info[i].stride);
 		}
 	}
 	return i;
+}
+
+int get_kernel_logo_param(char *fl_args)
+{
+		fl_args[0] = '\0';
+		if (IS_KERNEL_LOGO_DISABLED()) {
+			strcat(fl_args, "avio.kernel_logo_disable=1");
+			return 1;
+		} else {
+			return 0;
+		}
 }
