@@ -65,10 +65,10 @@ static int sunplus_config(struct phy_device *phydev)
 	phy_write(phydev, MDIO_DEVAD_NONE, 0x18, 0x0000);
 
 	sunplus_write_page(phydev, 0x6);
-	/* PHYAFE TX optimization and invert ADC clock */
+	/* 4% FE ATE loss test */
 	phy_write(phydev, MDIO_DEVAD_NONE, 0x19, 0x004c);
 	/* Tx_level optimization */
-	phy_write(phydev, MDIO_DEVAD_NONE, 0x15, 0x3030);
+	phy_write(phydev, MDIO_DEVAD_NONE, 0x15, 0x3038);
 	/* PD enable control */
 	phy_write(phydev, MDIO_DEVAD_NONE, 0x1c, 0x8880);
 
@@ -86,9 +86,16 @@ static int sunplus_config(struct phy_device *phydev)
 	while (count-- && !(phy_read(phydev, MDIO_DEVAD_NONE, 0x1) & 0x4))
 		mdelay(100);
 
-	if (!count)
+	if (!count) {
 		printf("WARING: phy link is down\n");
+	} else {
+		sunplus_write_page(phydev, 0x6);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x10, 0x5540);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x12, 0x8400);
+		phy_write(phydev, MDIO_DEVAD_NONE, 0x14, 0x1088);
+	}
 
+	sunplus_write_page(phydev, 0x0);
 	return 0;
 }
 
