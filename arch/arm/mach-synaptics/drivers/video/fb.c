@@ -260,7 +260,7 @@ int syna_parse_vpp_dsi_dt(struct udevice *dev)
 	READ_OF_8_NODE(pResCfg->initparams.data_lane_polarity, Data_Lane_Polarity);
 	READ_OF_8_NODE(pResCfg->initparams.virtual_channel, virtual_chan);
 	READ_OF_8_NODE(pResCfg->initparams.clk_lane_polarity, Clk_Lane_Polarity);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.rgbswap, rgbswap);
+	READ_OF_NODE(priv->vpp_config_param.rgbswap, rgbswap);
 
 	pResCfg->infoparams.resInfo.height = pResCfg->infoparams.resInfo.active_height +
 				pResCfg->infoparams.resInfo.vfrontporch +

@@ -2246,7 +2246,6 @@ typedef struct RESOLUTION_INFO_T {
 	int flag_3d;   /* 1 for 3D, 0 for 2D */
 	int freq;   /* pixel frequency */
 	int pts_per_cnt_4;   /* time interval in term of PTS for every 4 frames */
-	int rgbswap;
 } RESOLUTION_INFO;
 
 extern RESOLUTION_INFO m_resinfo_table[MAX_NUM_RESS];
@@ -2348,6 +2347,7 @@ typedef struct vpp_config_params {
 	VPP_MIPI_CONFIG_PARAMS *mipi_resinfo_params;
 	UINT32 hdmitx_enable;
 	UINT32 mipidsi_enable;
+	INT rgbswap;
 } vpp_config_params;
 
 struct berlin_fb_priv {

@@ -148,7 +148,7 @@ int syna_lcdc_mipi_dsi_config(struct berlin_fb_priv *priv)
 	pTimingInfo->pixelclock = pResCfg->infoparams.resInfo.freq;
 	pTimingInfo->bpp = priv->vpp_config_param.disp2_bpp;
 	pTimingInfo->outformat = priv->vpp_config_param.disp2_outformat;
-	pTimingInfo->rgbswap = pResCfg->infoparams.resInfo.rgbswap;
+	pTimingInfo->rgbswap = priv->vpp_config_param.rgbswap;
 
 	synaDsiInfo = &priv->lcdc_config_data->synaDsiInfo;
 
