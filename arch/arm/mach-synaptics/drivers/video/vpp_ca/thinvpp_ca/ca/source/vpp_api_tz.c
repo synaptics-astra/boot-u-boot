@@ -39,6 +39,25 @@
 //Memory shared with TA, should be 4K aligned
 #define PAGE_SIZE	0x1000
 
+/* Default disabled: enable only when debugging MIPI command payload. */
+#define VPP_MIPI_CMD_DUMP_ENABLE 0
+
+#if VPP_MIPI_CMD_DUMP_ENABLE
+static void vpp_dump_mipi_cmd_head(const VPP_MIPI_CMD_PARAMS *p_cmd_params,
+				   const u8 *tmpcmd)
+{
+	int i;
+	int dump_len;
+
+	dump_len = (p_cmd_params->bufsize < 16) ? p_cmd_params->bufsize : 16;
+	printf("%s: cmd head(%d/%u):", __func__, dump_len,
+	       (unsigned int)p_cmd_params->bufsize);
+	for (i = 0; i < dump_len; i++)
+		printf(" %02x", tmpcmd[i]);
+	printf("\n");
+}
+#endif
+
 //VPP API SHM internal control data structure
 typedef struct {
 	AMP_SHM_HANDLE            hShm;       /* shm handle */
@@ -401,6 +420,35 @@ int MV_VPPOBJ_LoadMipiConfig(VPP_MIPI_LOAD_CONFIG *config_params)
 
 	return vpp_invoke_pass_shm_helper(config_params, VPP_MIPI_CONFIG,
 					sizeof(VPP_MIPI_LOAD_CONFIG));
+}
+
+int mv_vppobj_mipi_panel_send_cmd(VPP_MIPI_CMD_PARAMS *p_cmd_params)
+{
+	VPP_MIPI_CMD_PARAMS tmpcmd_params;
+	u8 *tmpcmd;
+	int ret;
+
+	if (!p_cmd_params || !p_cmd_params->pcmd || !p_cmd_params->bufsize)
+		return MV_VPP_EBADPARAM;
+
+	tmpcmd = VPP_ALLOC_ALLIGNED(ALIGN((u32)p_cmd_params->bufsize, PAGE_SIZE),
+				    PAGE_SIZE);
+
+	if (!tmpcmd)
+		return MV_VPP_ENOMEM;
+
+	memcpy(tmpcmd, p_cmd_params->pcmd, p_cmd_params->bufsize);
+	tmpcmd_params = *p_cmd_params;
+	tmpcmd_params.pcmd = (ARCH_PTR_TYPE)tmpcmd;
+
+#if VPP_MIPI_CMD_DUMP_ENABLE
+	vpp_dump_mipi_cmd_head(p_cmd_params, tmpcmd);
+#endif
+
+	ret = vpp_invoke_pass_shm_helper(&tmpcmd_params, VPP_MIPI_SENDCMD,
+					 sizeof(VPP_MIPI_CMD_PARAMS));
+
+	return ret;
 }
 
 /***************************************

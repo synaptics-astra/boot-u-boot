@@ -90,6 +90,11 @@ int wrap_MV_VPP_Mipi_LoadConfig(struct berlin_fb_priv *priv)
 	wrap_MV_VPP_CallFuncAndReturn(vpp_fops.MV_VPP_Mipi_LoadConfig, priv);
 }
 
+int wrap_mv_vppobj_mipi_panel_send_cmd(UINT8 *pcmd, UINT16 bufsize)
+{
+	wrap_MV_VPP_CallFuncAndReturn(vpp_fops.mv_vppobj_mipi_panel_send_cmd, pcmd, bufsize);
+}
+
 void wrap_MV_VPP_Enable_Interrupt(struct berlin_fb_priv *priv)
 {
 	wrap_MV_VPP_CallFunc(vpp_fops.MV_VPP_Enable_Interrupt, priv);

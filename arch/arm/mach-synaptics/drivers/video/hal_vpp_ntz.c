@@ -69,6 +69,14 @@ int NTZ_MV_VPP_Mipi_LoadConfig(struct berlin_fb_priv *priv)
 	return 0;
 }
 
+int ntz_mv_vppobj_mipi_panel_send_cmd(UINT8 *pcmd, UINT16 bufsize)
+{
+	if (!pcmd || !bufsize)
+		return -EINVAL;
+
+	return dsi_panel_send_cmd(bufsize, (unsigned char *)pcmd);
+}
+
 void NTZ_MV_VPP_Enable_Interrupt(struct berlin_fb_priv *priv)
 {
 	syna_lcdc_Enable_IRQ(priv->lcdc_config_data->irqno);
@@ -101,6 +109,7 @@ void wrap_vpp_initialize_fops(struct vpp_fops *vpp_fops)
 	vpp_fops->MV_VPP_Config_Display = NULL;
 	vpp_fops->MV_VPP_Mipi_LoadInfoTable = NTZ_MV_VPP_Mipi_LoadInfoTable;
 	vpp_fops->MV_VPP_Mipi_LoadConfig = NTZ_MV_VPP_Mipi_LoadConfig;
+	vpp_fops->mv_vppobj_mipi_panel_send_cmd = ntz_mv_vppobj_mipi_panel_send_cmd;
 	vpp_fops->MV_VPP_Enable_Interrupt = NTZ_MV_VPP_Enable_Interrupt;
 	vpp_fops->MV_VPP_Display_Frame = NTZ_MV_VPP_Display_Frame;
 	vpp_fops->MV_VPP_Stop = NTZ_MV_VPP_Stop;

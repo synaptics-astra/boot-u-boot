@@ -167,6 +167,9 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 			char *const argv[])
 {
 	struct berlin_fb_priv *priv;
+	VPP_MIPI_CONFIG_PARAMS *p_res_cfg;
+	VPP_MIPI_CMD_HEADER *cmd_header;
+	u8 *cmd_payload;
 	int width, height, display;
 	struct udevice *dev;
 	int ret;
@@ -188,6 +191,18 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (dt_parse_status != 0) {
 		debug("DT parsing failed, skipping logo display\n");
 		return dt_parse_status;
+	}
+
+	p_res_cfg = priv->vpp_config_param.mipi_resinfo_params;
+	if (p_res_cfg && p_res_cfg->vppMipiCmd.pcmd) {
+		cmd_header = (VPP_MIPI_CMD_HEADER *)((u8 *)p_res_cfg->vppMipiCmd.pcmd +
+					      MIPI_INIT_CMD_START);
+		if (cmd_header->cmd_size) {
+			cmd_payload = (u8 *)cmd_header + MIPI_CMD_HEADER_SIZE;
+			ret = wrap_mv_vppobj_mipi_panel_send_cmd(cmd_payload, cmd_header->cmd_size);
+			if (ret)
+				printf("Failed to send panel init command: %d\n", ret);
+		}
 	}
 
 	for (display = 0; display < MAX_NUM_DISPLAY; display++) {

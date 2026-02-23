@@ -28,6 +28,7 @@
 #include "vpp_priv.h"
 #include "OSAL_api.h"
 #include "vpp.h"
+#include "hal_vpp_wrap.h"
 #include "panelcfg.h"
 #include <power/regulator.h>
 #include <dm/uclass.h>
@@ -39,6 +40,7 @@
 #include <fs.h>
 #include <dm/read.h>
 #include <cpu_func.h>
+#include <string.h>
 
 #define READ_OF_NODE(key, param) {				\
 	prop = fdt_getprop(blob, offset, #param, &len);		\
@@ -124,15 +126,16 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 {
 	struct berlin_fb_priv *priv = dev_get_priv(dev);
 	const void *blob = gd->fdt_blob;
-	vpp_config_params *pMipiConfig;
+	vpp_config_params *p_mipi_config;
 	VPP_MIPI_LOAD_CONFIG *pLoadcfg;
-	VPP_MIPI_CMD_HEADER  *pCmdHeader;
-	VPP_MIPI_CONFIG_PARAMS *pResCfg;
+	VPP_MIPI_CONFIG_PARAMS *p_res_cfg;
 	int ret;
 	int cmdsize, offset, len;
+	int total_bufsize = MAX_CMD_BUF_SIZE;
 	const u32 *prop;
 	UINT8 *dts_panel_commands = NULL;
 	struct ctfb_res_modes *video_mode = &priv->video_mode;
+	VPP_MIPI_CMD_HEADER *hdr;
 
 	ret = fdt_node_offset_by_compatible(blob, -1, "syna,mipi-dsi");
 	if (ret < 0) {
@@ -147,86 +150,86 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 		return 0;
 	}
 
-	pMipiConfig = &priv->vpp_config_param;
+	p_mipi_config = &priv->vpp_config_param;
 
-	pMipiConfig->mipi_config_params = VPP_ALLOC(sizeof(VPP_MIPI_LOAD_CONFIG));
-	if (!pMipiConfig->mipi_config_params) {
+	p_mipi_config->mipi_config_params = VPP_ALLOC(sizeof(VPP_MIPI_LOAD_CONFIG));
+	if (!p_mipi_config->mipi_config_params) {
 		printf("mipi_config_params memory failed\n");
 		return -ENOMEM;
 	}
-	memset(pMipiConfig->mipi_config_params, 0, sizeof(VPP_MIPI_LOAD_CONFIG));
+	memset(p_mipi_config->mipi_config_params, 0, sizeof(VPP_MIPI_LOAD_CONFIG));
 
-	pMipiConfig->mipi_resinfo_params = (VPP_MIPI_CONFIG_PARAMS *)
+	p_mipi_config->mipi_resinfo_params = (VPP_MIPI_CONFIG_PARAMS *)
 					    VPP_ALLOC_ALLIGNED(sizeof(VPP_MIPI_CONFIG_PARAMS),
 							       PAGE_SIZE);
-	if (!pMipiConfig->mipi_resinfo_params) {
+	if (!p_mipi_config->mipi_resinfo_params) {
 		printf("mipi_resinfo_params memory failed\n");
 		return -ENOMEM;
 	}
 
-	memset(pMipiConfig->mipi_resinfo_params, 0, sizeof(VPP_MIPI_CONFIG_PARAMS));
+	memset(p_mipi_config->mipi_resinfo_params, 0, sizeof(VPP_MIPI_CONFIG_PARAMS));
 
-	pLoadcfg = pMipiConfig->mipi_config_params;
-	pResCfg = pMipiConfig->mipi_resinfo_params;
-	pLoadcfg->vppMipiCfgPA = (ARCH_PTR_TYPE)pMipiConfig->mipi_resinfo_params;
+	pLoadcfg = p_mipi_config->mipi_config_params;
+	p_res_cfg = p_mipi_config->mipi_resinfo_params;
+	pLoadcfg->vppMipiCfgPA = (ARCH_PTR_TYPE)p_mipi_config->mipi_resinfo_params;
 
 	READ_OF_NODE(pLoadcfg->noOfresID, NO_OF_RESID);
-	READ_OF_NODE(pResCfg->initparams.resId, DSI_RES);
+	READ_OF_NODE(p_res_cfg->initparams.resId, DSI_RES);
 
-	READ_OF_NODE(pResCfg->infoparams.resInfo.active_width, ACTIVE_WIDTH);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.hfrontporch, HFP);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.hsyncwidth, HSYNCWIDTH);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.hbackporch, HBP);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.active_height, ACTIVE_HEIGHT);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.vfrontporch, VFP);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.vsyncwidth, VSYNCWIDTH);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.vbackporch, VBP);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.type, TYPE);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.scan, SCAN);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.frame_rate, FRAME_RATE);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.flag_3d, FLAG_3D);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.freq, FREQ);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.pts_per_cnt_4, PTS_PER_4);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_vb_min, VB_MIN);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_hb_min, HB_MIN);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_size_v_off_p, V_OFF);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_size_h_off_p, H_OFF);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_hb_vop_off, HB_VOP_OFF);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_vb0_vop_off, VB_VOP_OFF);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_hb_be, HB_BE);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_vb0_be, VB_BE);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_vb_fp, VB_FP);
-	READ_OF_8_NODE(pResCfg->infoparams.tgParams.tg_hb_fp, HB_FP);
-	READ_OF_NODE(pResCfg->infoparams.tgParams.pixel_clock, PIXEL_CLOCK);
-	READ_OF_NODE(pResCfg->infoparams.resInfo.width, HTOTAL);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.active_width, ACTIVE_WIDTH);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.hfrontporch, HFP);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.hsyncwidth, HSYNCWIDTH);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.hbackporch, HBP);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.active_height, ACTIVE_HEIGHT);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.vfrontporch, VFP);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.vsyncwidth, VSYNCWIDTH);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.vbackporch, VBP);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.type, TYPE);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.scan, SCAN);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.frame_rate, FRAME_RATE);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.flag_3d, FLAG_3D);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.freq, FREQ);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.pts_per_cnt_4, PTS_PER_4);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_vb_min, VB_MIN);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_hb_min, HB_MIN);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_size_v_off_p, V_OFF);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_size_h_off_p, H_OFF);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_hb_vop_off, HB_VOP_OFF);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_vb0_vop_off, VB_VOP_OFF);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_hb_be, HB_BE);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_vb0_be, VB_BE);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_vb_fp, VB_FP);
+	READ_OF_8_NODE(p_res_cfg->infoparams.tgParams.tg_hb_fp, HB_FP);
+	READ_OF_NODE(p_res_cfg->infoparams.tgParams.pixel_clock, PIXEL_CLOCK);
+	READ_OF_NODE(p_res_cfg->infoparams.resInfo.width, HTOTAL);
 
-	READ_OF_NODE(pResCfg->initparams.byte_clock, Byte_clk);
-	READ_OF_8_NODE(pResCfg->initparams.no_of_lanes, Lanes);
-	READ_OF_8_NODE(pResCfg->initparams.video_mode, Vid_mode);
-	READ_OF_8_NODE(pResCfg->initparams.receive_ack_packets, Recv_ack);
-	READ_OF_8_NODE(pResCfg->initparams.is_18_loosely, Loosely_18);
-	READ_OF_8_NODE(pResCfg->initparams.h_polarity, H_polarity);
-	READ_OF_8_NODE(pResCfg->initparams.v_polarity, V_Polarity);
-	READ_OF_8_NODE(pResCfg->initparams.data_en_polarity, Data_Polarity);
-	READ_OF_8_NODE(pResCfg->initparams.eotp_tx_en, Eotp_tx);
-	READ_OF_8_NODE(pResCfg->initparams.eotp_rx_en, Eotp_rx);
-	READ_OF_8_NODE(pResCfg->initparams.non_continuous_clock, non-Continuous_clk);
-	READ_OF_8_NODE(pResCfg->initparams.dpi_lp_cmd_en, dpi_lp_cmd);
-	READ_OF_8_NODE(pResCfg->initparams.color_coding, Color_coding);
-	READ_OF_NODE(pResCfg->initparams.no_of_chunks, Chunks);
-	READ_OF_NODE(pResCfg->initparams.null_packet_size, Null_Pkt);
-	READ_OF_8_NODE(pResCfg->initparams.data_lane_polarity, Data_Lane_Polarity);
-	READ_OF_8_NODE(pResCfg->initparams.virtual_channel, virtual_chan);
-	READ_OF_8_NODE(pResCfg->initparams.clk_lane_polarity, Clk_Lane_Polarity);
+	READ_OF_NODE(p_res_cfg->initparams.byte_clock, Byte_clk);
+	READ_OF_8_NODE(p_res_cfg->initparams.no_of_lanes, Lanes);
+	READ_OF_8_NODE(p_res_cfg->initparams.video_mode, Vid_mode);
+	READ_OF_8_NODE(p_res_cfg->initparams.receive_ack_packets, Recv_ack);
+	READ_OF_8_NODE(p_res_cfg->initparams.is_18_loosely, Loosely_18);
+	READ_OF_8_NODE(p_res_cfg->initparams.h_polarity, H_polarity);
+	READ_OF_8_NODE(p_res_cfg->initparams.v_polarity, V_Polarity);
+	READ_OF_8_NODE(p_res_cfg->initparams.data_en_polarity, Data_Polarity);
+	READ_OF_8_NODE(p_res_cfg->initparams.eotp_tx_en, Eotp_tx);
+	READ_OF_8_NODE(p_res_cfg->initparams.eotp_rx_en, Eotp_rx);
+	READ_OF_8_NODE(p_res_cfg->initparams.non_continuous_clock, non-Continuous_clk);
+	READ_OF_8_NODE(p_res_cfg->initparams.dpi_lp_cmd_en, dpi_lp_cmd);
+	READ_OF_8_NODE(p_res_cfg->initparams.color_coding, Color_coding);
+	READ_OF_NODE(p_res_cfg->initparams.no_of_chunks, Chunks);
+	READ_OF_NODE(p_res_cfg->initparams.null_packet_size, Null_Pkt);
+	READ_OF_8_NODE(p_res_cfg->initparams.data_lane_polarity, Data_Lane_Polarity);
+	READ_OF_8_NODE(p_res_cfg->initparams.virtual_channel, virtual_chan);
+	READ_OF_8_NODE(p_res_cfg->initparams.clk_lane_polarity, Clk_Lane_Polarity);
 	READ_OF_NODE(priv->vpp_config_param.rgbswap, rgbswap);
 
-	pResCfg->infoparams.resInfo.height = pResCfg->infoparams.resInfo.active_height +
-				pResCfg->infoparams.resInfo.vfrontporch +
-				pResCfg->infoparams.resInfo.vsyncwidth +
-				pResCfg->infoparams.resInfo.vbackporch;
+	p_res_cfg->infoparams.resInfo.height = p_res_cfg->infoparams.resInfo.active_height +
+				p_res_cfg->infoparams.resInfo.vfrontporch +
+				p_res_cfg->infoparams.resInfo.vsyncwidth +
+				p_res_cfg->infoparams.resInfo.vbackporch;
 
 	/* Lets default the cmd bufsize to panelcfg.h array*/
-	pResCfg->vppMipiCmd.bufsize = sizeof(panel_commands);
+	p_res_cfg->vppMipiCmd.bufsize = sizeof(panel_commands);
 
 	/* Get the "command" buffer from the DTS */
 	prop = fdt_getprop(blob, offset, "command", &cmdsize);
@@ -241,62 +244,59 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 			for (offset = 0; offset < cmdsize; offset++)
 				dts_panel_commands[offset] = bytes[offset];
 			/* We have the command array from DTS, update cmd bufsize accordingly */
-			pResCfg->vppMipiCmd.bufsize = cmdsize;
+			p_res_cfg->vppMipiCmd.bufsize = cmdsize;
 		}
 	}
 
-	if (!pResCfg->vppMipiCmd.bufsize) {
-		printf("Invalid MIPI commands\n");
-		ret = -EINVAL;
-		goto out;
+	if (!p_res_cfg->vppMipiCmd.bufsize) {
+		debug("[FB_DEBUG] Invalid MIPI commands\n");
+		return -EINVAL;
 	}
 
-	pResCfg->vppMipiCmd.pcmd = (ARCH_PTR_TYPE *)
-				   VPP_ALLOC_ALLIGNED(pResCfg->vppMipiCmd.bufsize,
-						      PAGE_SIZE);
-	if (!pResCfg->vppMipiCmd.pcmd) {
+	/* Allocate command buffer */
+	p_res_cfg->vppMipiCmd.pcmd = (ARCH_PTR_TYPE *)
+				   VPP_ALLOC_ALLIGNED(total_bufsize, PAGE_SIZE);
+	if (!p_res_cfg->vppMipiCmd.pcmd) {
 		printf("vppMipiCmd memory failed\n");
-		ret = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
-	memset(pResCfg->vppMipiCmd.pcmd, 0,
-	       pResCfg->vppMipiCmd.bufsize + MIPI_CMD_HEADER_SIZE);
+	memset(p_res_cfg->vppMipiCmd.pcmd, 0, total_bufsize);
 
 	/* If "command" was available in dtb use it, else use from panelcfg.h */
 	if (dts_panel_commands) {
 		/* Use the panel commands available in the DTS */
-		memcpy(pResCfg->vppMipiCmd.pcmd + MIPI_CMD_HEADER_SIZE, dts_panel_commands,
-		       pResCfg->vppMipiCmd.bufsize);
+		memcpy(p_res_cfg->vppMipiCmd.pcmd + MIPI_CMD_HEADER_SIZE, dts_panel_commands,
+		       p_res_cfg->vppMipiCmd.bufsize);
 	} else {
 		/* Use default panel commands from panelcfg.h*/
-		memcpy(pResCfg->vppMipiCmd.pcmd + MIPI_CMD_HEADER_SIZE, panel_commands,
-		       pResCfg->vppMipiCmd.bufsize);
+		memcpy(p_res_cfg->vppMipiCmd.pcmd + MIPI_CMD_HEADER_SIZE, panel_commands,
+		       p_res_cfg->vppMipiCmd.bufsize);
 	}
 
-	pCmdHeader = (VPP_MIPI_CMD_HEADER *)pResCfg->vppMipiCmd.pcmd;
-	pCmdHeader->cmd_type = VPP_CMD_TYPE_INIT;
-	pCmdHeader->cmd_size = pResCfg->vppMipiCmd.bufsize;
+	/* Set INIT command header */
+	hdr = (VPP_MIPI_CMD_HEADER *)p_res_cfg->vppMipiCmd.pcmd;
+	hdr->cmd_type = VPP_CMD_TYPE_INIT;
+	hdr->cmd_size = p_res_cfg->vppMipiCmd.bufsize;
 
 	/* visible resolution */
-	video_mode->xres = pResCfg->infoparams.resInfo.active_width;
-	video_mode->yres = pResCfg->infoparams.resInfo.active_height;
+	video_mode->xres = p_res_cfg->infoparams.resInfo.active_width;
+	video_mode->yres = p_res_cfg->infoparams.resInfo.active_height;
 	/* pixel clock in kHz */
-	video_mode->pixclock_khz = pResCfg->infoparams.tgParams.pixel_clock;
+	video_mode->pixclock_khz = p_res_cfg->infoparams.tgParams.pixel_clock;
 	/* time from sync to picture */
-	video_mode->left_margin = pResCfg->infoparams.resInfo.hfrontporch;
+	video_mode->left_margin = p_res_cfg->infoparams.resInfo.hfrontporch;
 	/* time from picture to sync */
-	video_mode->right_margin = pResCfg->infoparams.resInfo.hbackporch;
+	video_mode->right_margin = p_res_cfg->infoparams.resInfo.hbackporch;
 	/* time from sync to picture */
-	video_mode->upper_margin = pResCfg->infoparams.resInfo.vfrontporch;
-	video_mode->lower_margin = pResCfg->infoparams.resInfo.vbackporch;
+	video_mode->upper_margin = p_res_cfg->infoparams.resInfo.vfrontporch;
+	video_mode->lower_margin = p_res_cfg->infoparams.resInfo.vbackporch;
 	/* length of horizontal sync */
-	video_mode->hsync_len = pResCfg->infoparams.resInfo.hsyncwidth;
+	video_mode->hsync_len = p_res_cfg->infoparams.resInfo.hsyncwidth;
 	/* length of vertical sync */
-	video_mode->vsync_len = pResCfg->infoparams.resInfo.vsyncwidth;
+	video_mode->vsync_len = p_res_cfg->infoparams.resInfo.vsyncwidth;
 
 	ret = 0;
-
 out:
 	if (dts_panel_commands)
 		free(dts_panel_commands);

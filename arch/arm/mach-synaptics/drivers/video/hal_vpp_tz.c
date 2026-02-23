@@ -179,6 +179,20 @@ int TZ_MV_VPP_Mipi_LoadConfig(struct berlin_fb_priv *priv)
 	return MV_VPPOBJ_LoadMipiConfig(priv->vpp_config_param.mipi_config_params);
 }
 
+int TZ_MV_VPPOBJ_MipiPanelSendCmd(UINT8 *pcmd, UINT16 bufsize)
+{
+	VPP_MIPI_CMD_PARAMS cmd_params;
+
+	if (!pcmd || !bufsize)
+		return -EINVAL;
+
+	memset(&cmd_params, 0, sizeof(cmd_params));
+	cmd_params.pcmd = (ARCH_PTR_TYPE)pcmd;
+	cmd_params.bufsize = bufsize;
+
+	return mv_vppobj_mipi_panel_send_cmd(&cmd_params);
+}
+
 void TZ_MV_VPP_Enable_Interrupt(struct berlin_fb_priv *priv)
 {
 	MV_VPP_Enable_IRQ();
@@ -214,6 +228,7 @@ void wrap_vpp_initialize_fops(struct vpp_fops *vpp_fops)
 	vpp_fops->MV_VPP_Config_Display = TZ_MV_VPP_Config_Display;
 	vpp_fops->MV_VPP_Mipi_LoadInfoTable = TZ_MV_VPP_Mipi_LoadInfoTable;
 	vpp_fops->MV_VPP_Mipi_LoadConfig = TZ_MV_VPP_Mipi_LoadConfig;
+	vpp_fops->mv_vppobj_mipi_panel_send_cmd = TZ_MV_VPPOBJ_MipiPanelSendCmd;
 	vpp_fops->MV_VPP_Enable_Interrupt = TZ_MV_VPP_Enable_Interrupt;
 	vpp_fops->MV_VPP_Display_Frame = TZ_MV_VPP_Display_Frame;
 	vpp_fops->MV_VPP_Stop = MV_VPPOBJ_DestroyDisplay;

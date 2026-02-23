@@ -39,6 +39,7 @@ struct vpp_fops {
 	int (*MV_VPP_Config_Display)(struct berlin_fb_priv *priv);
 	int (*MV_VPP_Mipi_LoadInfoTable)(struct berlin_fb_priv *priv);
 	int (*MV_VPP_Mipi_LoadConfig)(struct berlin_fb_priv *priv);
+	int (*mv_vppobj_mipi_panel_send_cmd)(UINT8 *pcmd, UINT16 bufsize);
 	void (*MV_VPP_Enable_Interrupt)(struct berlin_fb_priv *priv);
 	int (*MV_VPP_Display_Frame)(struct berlin_fb_priv *priv,
 				    VBUF_INFO *p_vpp_buf, int display, int width, int height);
@@ -57,6 +58,7 @@ int wrap_MV_VPP_SetHdmiTxControl(void);
 int wrap_MV_VPP_Config_Display(struct berlin_fb_priv *priv);
 int wrap_MV_VPP_Mipi_LoadInfoTable(struct berlin_fb_priv *priv);
 int wrap_MV_VPP_Mipi_LoadConfig(struct berlin_fb_priv *priv);
+int wrap_mv_vppobj_mipi_panel_send_cmd(UINT8 *pcmd, UINT16 bufsize);
 void wrap_MV_VPP_Enable_Interrupt(struct berlin_fb_priv *priv);
 int wrap_MV_VPP_Display_Frame(struct berlin_fb_priv *priv, VBUF_INFO *p_vpp_buf,
 			      int display, int width, int height);

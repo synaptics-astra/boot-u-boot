@@ -2676,6 +2676,13 @@ int MV_VPPOBJ_Resume(int handle);
 int MV_VPPOBJ_LoadMipiConfig(VPP_MIPI_LOAD_CONFIG *pConfigParams);
 
 /***************************************
+ * FUNCTION: Send mipi panel commands
+ * INPUT: VPP_MIPI_CMD_PARAMS
+ * RETURN: NONE
+ **************************************/
+int mv_vppobj_mipi_panel_send_cmd(VPP_MIPI_CMD_PARAMS *p_cmd_params);
+
+/***************************************
  * FUNCTION: VPP stop
  * INPUT: NONE
  * RETURN: NONE
