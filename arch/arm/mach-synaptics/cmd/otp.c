@@ -89,6 +89,10 @@ enum OTP_FIELD_ID {
 	OTP_MP_PROVISION_DONE,		/* 1 bit  (1 x uint32_t) */
 	OTP_SCS_AREA_SIZE_SEL,		/* 2 bits (1 x uint32_t) */
 	OTP_REE_JTAG_PROTECTION_POLICY, /* 2 bits (1 x uint32_t) */
+	OTP_REE_VERSION,		/* 32 bits (1 x uint32_t) */
+
+	OTP_RKEK_ID_0,			/* 64 bits = 2 x uint32_t */
+	OTP_RKEK_ID_1,
 
 	/* ---- Synaptics Ownership ---- */
 	OTP_EMMC_BOOT_DISABLE	= 200,	/* 1 bit  (1 x uint32_t) */
@@ -97,6 +101,9 @@ enum OTP_FIELD_ID {
 	OTP_OEM_AUDIO_CUSTOMER_ID,	/* 32 bits (1 x uint32_t) */
 	OTP_PRODUCTION_CHIP_FLAG,	/* 3 bits  (1 x uint32_t) */
 	OTP_USB_BOOT_DISABLE,		/* 1 bit  (1 x uint32_t) */
+	OTP_BOOT_VERSION,		/* 32 bits (1 x uint32_t) */
+	OTP_SOC_UID_0,			/* 64 bits = 2 x uint32_t */
+	OTP_SOC_UID_1,
 
 	OTP_FIELD_MAX
 };
@@ -125,10 +132,12 @@ static const struct otp_field_entry  otp_field_table[] = {
 	X(OTP_AESK0_0), X(OTP_AESK0_1), X(OTP_AESK0_2), X(OTP_AESK0_3),
 	X(OTP_REE_SEGID), X(OTP_REE_SECURITY_ENABLE), X(OTP_BOOT_SECURITY_ENABLE),
 	X(OTP_MP_PROVISION_DONE), X(OTP_SCS_AREA_SIZE_SEL), X(OTP_REE_JTAG_PROTECTION_POLICY),
+	X(OTP_REE_VERSION), X(OTP_RKEK_ID_0), X(OTP_RKEK_ID_1),
 
 	/* Synaptics Ownership */
 	X(OTP_EMMC_BOOT_DISABLE), X(OTP_SPI_BOOT_DISABLE), X(OTP_DOLBY_AUDIO_DISABLE),
 	X(OTP_OEM_AUDIO_CUSTOMER_ID), X(OTP_PRODUCTION_CHIP_FLAG), X(OTP_USB_BOOT_DISABLE),
+	X(OTP_BOOT_VERSION), X(OTP_SOC_UID_0), X(OTP_SOC_UID_1),
 
 	X(OTP_FIELD_MAX)
 #undef X
@@ -163,6 +172,11 @@ struct PUBLIC_OTP_ITEMS {
 	unsigned char  BSCAN_Protection_dup;
 	unsigned char  STEST_Protection;
 	unsigned char  STEST_Protection_dup;
+	unsigned char  RKEKID[8];
+	unsigned int   K0_REE_HASH[8];
+	unsigned int   REE_VERSION;
+	unsigned int   BOOT_VERSION;
+	unsigned int   JTAGProtectionLevel;
 };
 
 static void printPublicOtp(const struct PUBLIC_OTP_ITEMS *otp)
@@ -205,6 +219,21 @@ static void printPublicOtp(const struct PUBLIC_OTP_ITEMS *otp)
 	printf("BSCAN_Protection_dup: 0x%02X\n", otp->BSCAN_Protection_dup);
 	printf("STEST_Protection: 0x%02X\n", otp->STEST_Protection);
 	printf("STEST_Protection_dup: 0x%02X\n", otp->STEST_Protection_dup);
+	printf("REE_VERSION: 0x%08X\n", otp->REE_VERSION);
+	printf("BOOT_VERSION: 0x%08X\n", otp->BOOT_VERSION);
+	printf("JTAGProtectionLevel: 0x%08X\n", otp->JTAGProtectionLevel);
+
+	printf("RKEKID: %02x%02x%02x%02x%02x%02x%02x%02x\n",
+	       otp->RKEKID[7], otp->RKEKID[6],
+	       otp->RKEKID[5], otp->RKEKID[4],
+	       otp->RKEKID[3], otp->RKEKID[2],
+	       otp->RKEKID[1], otp->RKEKID[0]);
+
+	printf("K0_REE_HASH: ");
+	for (i = 0; i < 8; i++)
+		printf("0x%08X ", otp->K0_REE_HASH[i]);
+
+	printf("\n");
 }
 
 static int do_otp_read_public(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
@@ -233,6 +262,9 @@ static int do_otp_read_public(struct cmd_tbl *cmdtp, int flag, int argc, char * 
 		printf("ret a0 = 0x%lx, ret a1 = 0x%lx, ret a2 = 0x%lx, ret a3 = 0x%lx\n",
 		       res.a0, res.a1, res.a2, res.a3);
 	}
+
+	/* RKEK_ID , shared_buf[0] */
+	memcpy((unsigned char *)pubOtp.RKEKID, shared_buf, 8);
 
 	/* Gen2 row 64~66, shared_buf[8] */
 	memcpy((unsigned char *)pubOtp.TA_Vendor_SegID, shared_buf + 8, 24);
@@ -328,6 +360,18 @@ static int do_otp_read_public(struct cmd_tbl *cmdtp, int flag, int argc, char * 
 	/* CAS4 row 26 byte 3 bit 2~3, shared_buf[120 + 3] */
 	read_byte = (*(unsigned char *)(shared_buf + 120 + 3) & 0x0c) >> 2;
 	memcpy((unsigned char *)&pubOtp.STEST_Protection_dup, &read_byte, 1);
+
+	/* K0_REE_HASH, shared_buf[128], shared_buf[159] */
+	memcpy(&pubOtp.K0_REE_HASH, shared_buf + 128, 8 * sizeof(unsigned int));
+
+	/* REE_VERSION, shared_buf[160] */
+	memcpy(&pubOtp.REE_VERSION, shared_buf + 160, sizeof(unsigned int));
+
+	/* BOOT_VERSION, shared_buf[164] */
+	memcpy(&pubOtp.BOOT_VERSION, shared_buf + 164, sizeof(unsigned int));
+
+	/* JTAGProtectionLevel, shared_buf[168] */
+	memcpy(&pubOtp.JTAGProtectionLevel, shared_buf + 168, sizeof(unsigned int));
 
 	printPublicOtp(&pubOtp);
 
