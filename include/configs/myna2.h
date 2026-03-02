@@ -31,15 +31,18 @@
 	"upgrade_available=0\0" \
 	"rescue_load=ext4load mmc 0:2 0x10000000 Image; "\
 		     "ext4load mmc 0:2 0x17c00000 board.dtb; "\
-		     "ext4load mmc 0:2 0x8c00000 initramfs.rootfs.cpio.gz\0" \
-	"rescue_setup=setenv kernel_comp_addr_r 0x7c00000; "\
-		      "setenv kernel_comp_size $filesize; "\
+		     "ext4load mmc 0:2 0x12000000 initramfs.rootfs.cpio.gz\0" \
+	"rescue_setup=setenv ramdisk_size $filesize; "\
+		      "setenv kernel_comp_addr_r 0x7c00000; "\
+		      "setenv kernel_comp_size 0x4000000; "\
 		      "setenv bootm_low 0x0; "\
 		      "setenv bootm_size 0x10000000; "\
-		      "setenv bootargs shell earlycon console=ttyS0,115200 rootwait rootfstype=ext4\0" \
-	"rescue_exec=booti 0x10000000 0x8c00000:$filesize 0x17c00000\0" \
+		      "setenv bootargs shell earlycon console=ttyS0,115200 "\
+		      "rootwait rootfstype=ext4; "\
+		      "setenv initrd_high\0" \
+	"rescue_exec=booti 0x10000000 0x12000000:${ramdisk_size} 0x17c00000\0" \
 	"rescue_boot=echo \"*** RESCUE MODE TRIGGERED ***\"; "\
-		     "run rescue_load; run rescue_setup; run rescue_exec\0"
+		     "setenv initrd_high; run rescue_load; run rescue_setup; run rescue_exec\0"
 #else
 #define CFG_EXTRA_ENV_SETTINGS \
 	"upgrade_available=0\0" \
