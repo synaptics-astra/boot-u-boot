@@ -56,9 +56,11 @@ void init_ion_cacheable_mempool(void)
 			}
 
 			debug("nonsecure cacheable memory region base = 0x%08lx\n", mstart);
-			init_mmgr_by_type(MEM_ION_CACHEABLE, mstart, CACHEABLE_MEM_POOL_SIZE);
+			init_mmgr_by_type(MEM_ION_CACHEABLE, mstart,
+				size < CACHEABLE_MEM_POOL_SIZE ? size : CACHEABLE_MEM_POOL_SIZE);
 			if (size < CACHEABLE_MEM_POOL_SIZE)
-				printf("nonsecure cacheable memory region size = 0x%08x\n", size);
+				printf("INFO: nonsecure cacheable memory region size = 0x%08x\n",
+				       size);
 
 			return;
 		}
