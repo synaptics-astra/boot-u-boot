@@ -32,6 +32,7 @@
 #include "vpp_api_types.h"
 #include "asm-generic/gpio.h"
 #include "syna_logo.h"
+#include "videomodes.h"
 
 #if 1
 //macro's needed for porting
@@ -2357,6 +2358,7 @@ struct berlin_fb_priv {
 	struct vpp_config_params vpp_config_param;
 	struct lcdc_config *lcdc_config_data;
 	struct gpio_desc enable;
+	struct ctfb_res_modes video_mode;
 };
 
 typedef struct VPP_INIT_PARM_T {
