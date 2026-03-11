@@ -55,5 +55,6 @@ int syna_load_logo_push_frame(struct berlin_fb_priv *priv, int width,
 			      int height, int display_id);
 int syna_parse_dt_entry(struct udevice *dev);
 void syna_probe_and_enable_regulators(void);
+int read_boot_file(struct berlin_fb_priv *priv);
 
 #endif

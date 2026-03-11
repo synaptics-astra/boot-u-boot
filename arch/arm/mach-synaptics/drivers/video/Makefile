@@ -97,6 +97,7 @@ obj-y += vpp_api.o
 obj-y += fb.o
 obj-y += fb_fdt_util.o
 obj-y += syna_dt_parser.o
+obj-y += syna_persistent_file_parser.o
 obj-y += syna_fb_logo.o
 obj-$(CONFIG_SYNA_WSPANEL_1080P) += panel/waveshare/panel-waveshare-dsi.o
 

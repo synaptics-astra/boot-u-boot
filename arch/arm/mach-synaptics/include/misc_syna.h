@@ -52,5 +52,7 @@ u32 get_fastlogo_status(void);
 void set_fastlogo_status(bool status);
 int get_kernel_logo_param(char *fl_args);
 int get_fastlogo_addr(char *fl_args);
+void set_force_persistent_res_status(bool mode);
+bool get_force_persistent_res_status(void);
 
 #endif

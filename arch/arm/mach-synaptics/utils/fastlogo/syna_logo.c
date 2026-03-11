@@ -55,6 +55,15 @@ DECLARE_GLOBAL_DATA_PTR;
 
 union avio_fastlogo_info_u fastlogo_display_info;
 
+/*
+ * Global flag to indicate if persistent resolution configuration failed
+ * When set to true, indicates that the user-specified resolution from /boot/res.txt
+ * is not supported by the connected sink and was downgraded to a compatible resolution.
+ * This flag is passed to Linux kernel via 'syna_drm.force_persistent_res' cmdline parameter,
+ * allowing RDK to handle the mismatch and update the persistent configuration if needed.
+ */
+static bool force_persistent_res;
+
 #ifndef CONFIG_GENX_ENABLE
 #define GENX_IMAGE_HEADER_FASTLOGO_SIZE		0
 #else
@@ -405,4 +414,14 @@ int get_kernel_logo_param(char *fl_args)
 		} else {
 			return 0;
 		}
+}
+
+void set_force_persistent_res_status(bool force_persistent_res_flag)
+{
+	force_persistent_res = force_persistent_res_flag;
+}
+
+bool get_force_persistent_res_status(void)
+{
+	return force_persistent_res;
 }

@@ -29,6 +29,12 @@
 #include "vpp_api.h"
 #include "vpp_priv.h"
 #include "vpp.h"
+#include "misc_syna.h"
+
+/* Resolution capability check macros */
+#define SYNA_IS_UHD_RESID(res_id) ((res_id) == HDMI_MAX_RES_ENABLED_50_25 || \
+	(res_id) == HDMI_MAX_RES_ENABLED_60_30)
+#define SYNA_IS_FHD_RESID(res_id) ((res_id) == RES_1080P50 || (res_id) == RES_1080P60)
 
 int TZ_MV_VPP_InitVPPS(struct berlin_fb_priv *priv)
 {
@@ -76,12 +82,84 @@ static void TZ_MV_GetHDMIPreferredRes(struct vpp_config_params *vpp_config_param
 	}
 }
 
+/*
+ * TZ_MV_ValidateAndUpdateResolution - Validate requested resolution against
+ * sink capabilities
+ * @vpp_config_param: VPP configuration parameters to update
+ * @requested_res_id: Resolution ID requested from persistent configuration
+ * (0 = use sink's preferred)
+ *
+ * This function validates if the requested resolution (from /boot/res.txt)
+ * is supported by the connected sink (TV/Monitor). If not supported, it
+ * downgrades to the best compatible resolution.
+ */
+static void TZ_MV_ValidateAndUpdateResolution(struct vpp_config_params *vpp_config_param,
+					      int requested_res_id)
+{
+	int req_uhd_res = 0, req_fhd_res = 0, req_hd_res = 0;
+	int is_sink_uhd = 0, is_sink_fhd = 0;
+	int max_sink_res_id;
+	struct vpp_config_params temp_vpp_config_param;
+
+	/* If we are not able to read from sink, then fall back to dts default resolution */
+	TZ_MV_GetHDMIPreferredRes(&temp_vpp_config_param);
+	max_sink_res_id = temp_vpp_config_param.disp1_res_id;
+
+	/* If no valid requested resolution, use sink's preferred resolution */
+	if (requested_res_id <= 0) {
+		vpp_config_param->disp1_res_id = max_sink_res_id;
+		return;
+	}
+
+	is_sink_uhd = SYNA_IS_UHD_RESID(max_sink_res_id);
+	is_sink_fhd = SYNA_IS_FHD_RESID(max_sink_res_id);
+
+	req_uhd_res = SYNA_IS_UHD_RESID(requested_res_id);
+	req_fhd_res = SYNA_IS_FHD_RESID(requested_res_id);
+	req_hd_res = !req_uhd_res && !req_fhd_res;
+
+	if (req_uhd_res && !is_sink_uhd) {
+		/*
+		 * If persisted/requested UHD res_id not supported by sink,
+		 * then select b/w supported FHD/HD res
+		 */
+		if (is_sink_fhd) {
+			vpp_config_param->disp1_res_id =
+				(max_sink_res_id == RES_1080P50) ?
+				RES_1080P50 : RES_1080P60;
+		} else {
+			vpp_config_param->disp1_res_id =
+				(max_sink_res_id == RES_720P50) ?
+				RES_720P50 : RES_720P60;
+		}
+	} else if ((req_fhd_res && is_sink_uhd) ||
+		   (req_hd_res && (is_sink_fhd || is_sink_uhd))) {
+		/*
+		 * If sink support better res_id than persisted/requested,
+		 * then continue with persisted/requested res_id
+		 */
+		set_force_persistent_res_status(true);
+	} else {
+		vpp_config_param->disp1_res_id = max_sink_res_id;
+	}
+}
+
 int TZ_MV_VPP_Set_Format(struct berlin_fb_priv *priv)
 {
 	struct vpp_config_params *vpp_config_param = &priv->vpp_config_param;
+	int requested_res_id;
 
-	if (IS_MODE_HDMI(vpp_config_param->display_mode))
-		TZ_MV_GetHDMIPreferredRes(vpp_config_param);
+	/* Check persistent file for only HDMI enabled system */
+	if (priv->vpp_config_param.display_mode == VOUT_DISP_SINGLE_MODE_SEC &&
+	    priv->vpp_config_param.disp1_res_id == RES_DSI_CUSTOM)
+		return MV_VPPOBJ_SetFormat(vpp_config_param);
+
+	if (IS_MODE_HDMI(vpp_config_param->display_mode)) {
+		/* Validation/Modification applicable for only HDMI resolution only */
+		/* requested_res_id : Read from boot file otherwise 0 (sink's preferred) */
+		requested_res_id = read_boot_file(priv) ? 0 : vpp_config_param->disp1_res_id;
+		TZ_MV_ValidateAndUpdateResolution(vpp_config_param, requested_res_id);
+	}
 
 	return MV_VPPOBJ_SetFormat(vpp_config_param);
 }

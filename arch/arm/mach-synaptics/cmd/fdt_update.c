@@ -62,31 +62,57 @@ enum {
 	FDT_UPDATE_OVERLAY = BIT(4),
 };
 
-static int setup_kernel_logo_param(char *bootargs)
+/* Add/Append various video related kernel command line params */
+static void setup_video_params(char *bootargs)
 {
-	char __maybe_unused tmp_buf[128];
+	char tmp_buf[128];
+	int param_added = 0;
+	bool force_persistent_res = get_force_persistent_res_status();
+	u32 fl_status = get_fastlogo_status();
 
-	int ret_val = 0;
-
-	if (get_kernel_logo_param(tmp_buf)) {
+	/* Indicate resolution mismatch and forced persistent resolution */
+	if (force_persistent_res) {
+		memset(tmp_buf, 0x0, sizeof(tmp_buf));
+		snprintf(tmp_buf, (sizeof(tmp_buf) - 1),
+			 "syna_drm.force_persistent_res=%d", force_persistent_res);
 		strcat(bootargs, tmp_buf);
-		ret_val = 1;
+		param_added++;
 	}
 
-	return ret_val;
-}
+	/* Pass the fastlogo status - displayed in u-boot or not */
+	if (fl_status) {
+		if (param_added)
+			strcat(bootargs, " ");
+		memset(tmp_buf, 0x0, sizeof(tmp_buf));
+		snprintf(tmp_buf, (sizeof(tmp_buf) - 1), "avio.fastlogo_status=%d", fl_status);
+		strcat(bootargs, tmp_buf);
+		param_added++;
+	}
 
-static int setup_fbcon_param(char *bootargs)
-{
-	char __maybe_unused tmp_buf[128];
+	/* Pass fastlogo address in CMA to kernel - syna_drm.logo_info=addr@wxh-s[,addr@wxh-s] */
+	if (get_fastlogo_addr(tmp_buf)) {
+		if (param_added)
+			strcat(bootargs, " ");
+		strcat(bootargs, tmp_buf);
+		param_added++;
+	}
 
+	/* Pass kernel logo status enabled/disabled from uboot - avio.kernel_logo_disable=[0|1]*/
+	if (get_kernel_logo_param(tmp_buf)) {
+		if (param_added)
+			strcat(bootargs, " ");
+		strcat(bootargs, tmp_buf);
+		param_added++;
+	}
+
+	/* Enable/Disable framebuffer console feature from uboot */
 	if (IS_ENABLED(CONFIG_SYNA_DISABLE_FBCON)) {
+		if (param_added)
+			strcat(bootargs, " ");
 		memset(tmp_buf, 0x0, sizeof(tmp_buf));
 		snprintf(tmp_buf, (sizeof(tmp_buf) - 1), "fbcon=map:off");
 		strcat(bootargs, tmp_buf);
-		return 1;
-	} else {
-		return 0;
+		param_added++;
 	}
 }
 
@@ -104,24 +130,6 @@ static void setup_cma_param(char *bootargs)
 	}
 }
 #endif
-
-static void setup_fastlogo_param(char *bootargs)
-{
-	char tmp_buf[128];
-	u32 fl_status = get_fastlogo_status();
-
-	if (fl_status) {
-		memset(tmp_buf, 0x0, sizeof(tmp_buf));
-		snprintf(tmp_buf, (sizeof(tmp_buf) - 1), "avio.fastlogo_status=%d", fl_status);
-		strcat(bootargs, tmp_buf);
-	}
-
-	if (get_fastlogo_addr(tmp_buf)) {
-		if (fl_status)
-			strcat(bootargs, " ");
-		strcat(bootargs, tmp_buf);
-	}
-}
 
 static int setup_reserved_mem(void *fdt, struct mem_region *reserved_mem, int reserved_num)
 {
@@ -376,15 +384,8 @@ int setup_bootargs(void *fdt)
 	setup_fe_bgs(newbootargs);
 	strcat(newbootargs, " ");
 #endif
-
-	setup_fastlogo_param(newbootargs);
+	setup_video_params(newbootargs);
 	strcat(newbootargs, " ");
-
-	if (setup_kernel_logo_param(newbootargs))
-		strcat(newbootargs, " ");
-
-	if (setup_fbcon_param(newbootargs))
-		strcat(newbootargs, " ");
 
 #ifndef CONFIG_TARGET_KLAMATH
 	setup_cma_param(newbootargs);
