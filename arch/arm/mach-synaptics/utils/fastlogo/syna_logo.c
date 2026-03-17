@@ -64,13 +64,22 @@ union avio_fastlogo_info_u fastlogo_display_info;
  */
 static bool force_persistent_res;
 
-#ifndef CONFIG_GENX_ENABLE
-#define GENX_IMAGE_HEADER_FASTLOGO_SIZE		0
-#else
-#define GENX_IMAGE_HEADER_FASTLOGO_SIZE		(336 + PREPEND_IMAGE_INFO_SIZE)
-#endif
+/*
+ * Offset to fastlogo_header_t within the partition buffer:
+ * genx_v3: 64B (PREPEND_IMAGE_INFO_SIZE - 'struct img_info' size only),
+ * genx_v1_v2: 400B (PREPEND_IMAGE_INFO_SIZE + GENX_IMAGE_HEADER_LINUX_SIZE (336B wrapper)),
+ * none: 0 B
+ */
+#define GENX_IMAGE_HEADER_LINUX_SIZE 336
+#define GENX_V1_V2_IMAGE_HEADER_FASTLOGO_SIZE (PREPEND_IMAGE_INFO_SIZE + \
+	GENX_IMAGE_HEADER_LINUX_SIZE)
+#define GENX_V3_IMAGE_HEADER_FASTLOGO_SIZE (PREPEND_IMAGE_INFO_SIZE)
 
-#define LOGO_HEADER_SIZE	(1024 + GENX_IMAGE_HEADER_FASTLOGO_SIZE)
+#define IMAGE_HEADER_FASTLOGO_SIZE \
+	(IS_ENABLED(CONFIG_SYNA_GENX_V3) ? GENX_V3_IMAGE_HEADER_FASTLOGO_SIZE : \
+	(IS_ENABLED(CONFIG_GENX_ENABLE) ? GENX_V1_V2_IMAGE_HEADER_FASTLOGO_SIZE : 0))
+
+#define LOGO_HEADER_SIZE	(1024 + IMAGE_HEADER_FASTLOGO_SIZE)
 
 struct fl_logo_info {
 	unsigned long addr;
@@ -226,7 +235,7 @@ int syna_load_logo_info(int width, int height,
 
 	block_size = syna_get_blksize();
 	pad_size = block_size * 2;
-	total_header_size = GENX_IMAGE_HEADER_FASTLOGO_SIZE + LOGO_HEADER_SIZE + pad_size;
+	total_header_size = IMAGE_HEADER_FASTLOGO_SIZE + LOGO_HEADER_SIZE + pad_size;
 	logo_header = (u8 *)malloc_ion_cacheable(total_header_size);
 
 	debug("fastlogo: logo partition name %s header-size:%d, [blk/pad]_size %d/%d\n",
@@ -280,7 +289,7 @@ int syna_load_logo_info(int width, int height,
 		ret = 0;
 	}
 
-	header = img_buff + GENX_IMAGE_HEADER_FASTLOGO_SIZE;
+	header = img_buff + IMAGE_HEADER_FASTLOGO_SIZE;
 	fl_header = check_validate_logo(width, height, header);
 	if (!fl_header) {
 		printf("fastlogo: No matching logo found for WxH:[%d]x[%d]\n",
