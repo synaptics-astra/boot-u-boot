@@ -27,7 +27,11 @@
 #include <genimg.h>
 #include <android_image.h>
 #include <linux/mtd/mtd.h>
+#ifdef CONFIG_CMD_ABOOTIMG
+#include <avb_verify.h>
+#endif
 #include "fastboot_syna.h"
+#include "linux/kconfig.h"
 #include "mem_init.h"
 #include "tee_client.h"
 #include "spinand_drv.h"
@@ -43,13 +47,20 @@
 #define CODETYPE_KERNEL 5
 
 #define MIN_ANDROID_IMG_SIZE (1 * 1024 * 1024)
-#define MAX_ANDROID_IMG_SIZE (30 * 1024 * 1024)
+#define MAX_ANDROID_IMG_SIZE (32 * 1024 * 1024)
+#define ANDROID_DTB_SIZE (10 * 1024 * 1024)
 
 #define KERNEL_A_NAME           "boot_a"
 #define KERNEL_B_NAME           "boot_b"
 
 #define	MAX_PAGESIZE 8192
 #define CUSTKEY_SIZE		(5 << 10)
+
+#define ANDROID_LOAD_ADDR 0x20000000
+#define ANDROID_DTB_INDEX 0
+
+#define MMC_DEV 0
+#define MMC_BLK_SIZE 512
 
 #define SYNA_SPI_BASE 0xF0000000
 #define SYNA_SPI_RANGE 0x1000000
@@ -132,21 +143,31 @@ spi_out:
 	return ret;
 }
 
-static void *load_android_image(enum boot_type_t boot_type, const char *pt_name,
-				u32 offset, unsigned char *buff)
+static int load_syna_image(enum boot_type_t boot_type, int ab_mode,
+			   u32 offset, unsigned char **bootimg_hdr)
 {
 	struct img_info *img_info;
 	struct img_header *img_hdr;
-	unsigned char *img_buff = buff + CUSTKEY_SIZE;
+	u8 *buff =  NULL;
+	unsigned char *img_buff;
 	u32 read_size, img_size;
+	const char *pt_name = NULL;
 	int ret = -1;
+	int verify_ret = 0;
 
+	/* reserve 1M for key */
+	buff = malloc(MAX_ANDROID_IMG_SIZE + 0x100000);
+	if (!buff)
+		goto out;
+
+	img_buff = buff + CUSTKEY_SIZE;
+	pt_name = (ab_mode == BOOTSEL_A) ?  KERNEL_A_NAME : KERNEL_B_NAME;
 	read_image(boot_type, pt_name, offset, img_buff, MAX_PAGESIZE);
 
 	img_info = (struct img_info *)img_buff;
 	if (img_info->magic != IMG_INFO_MAGIC) {
 		printf("ERROR: incorrect magic in image info  0x%08x\n", img_info->magic);
-		return NULL;
+		goto out;
 	}
 
 	/* find out boot image read size */
@@ -157,24 +178,31 @@ static void *load_android_image(enum boot_type_t boot_type, const char *pt_name,
 	/* check read size  */
 	if (read_size > MAX_ANDROID_IMG_SIZE || read_size < MIN_ANDROID_IMG_SIZE) {
 		printf("ERROR: img_size %u is invalid\n", read_size);
-		return NULL;
+		goto out;
 	}
 
 	read_image(boot_type, pt_name, offset, img_buff, read_size);
 	img_hdr = (void *)(img_buff + PREPEND_IMAGE_INFO_SIZE);
 
 	/* verify image */
-	ret = tee_verify_image(5, (void *)img_hdr, img_size,
-			       (void *)img_hdr, img_size, IMAGE_TYPE_LINUX_KERNEL);
-	if (ret <= 0) {
-		printf("ERROR: Verify Linux Kernel image failed! ret=0x%x\n", ret);
-		return NULL;
+	verify_ret = tee_verify_image(5, (void *)img_hdr, img_size,
+				      (void *)img_hdr, img_size, IMAGE_TYPE_LINUX_KERNEL);
+	if (verify_ret <= 0) {
+		printf("ERROR: Verify Linux Kernel image failed! verify_ret=0x%x\n", verify_ret);
+		goto out;
 	}
 
-	return (void *)img_hdr + GENX_IMAGE_HEADER_LINUX_SIZE;
+	*bootimg_hdr = (void *)img_hdr + GENX_IMAGE_HEADER_LINUX_SIZE;
+	return 0;
+
+out:
+	if (buff)
+		free(buff);
+
+	return ret;
 }
 
-static int boot_android_image(unsigned char *buff)
+static int boot_syna_image(unsigned char *buff)
 {
 	int result = 0;
 	u32 mkbootimg_page;
@@ -222,6 +250,283 @@ static int boot_android_image(unsigned char *buff)
 	return 0;
 }
 
+#ifdef CONFIG_CMD_ABOOTIMG
+static int load_android_partition(int mmcdev, const char *part_prefix,
+				  char slot, const char *addr_env,
+				  const char *start_env, const char *size_env)
+{
+	char part_name[32];
+	char cmd[128];
+	u8 *buff, *env_partsize, *env_start;
+	u32 blkcnt = 0, lbastart = 0;
+	u32 ret;
+	struct mmc *mmc = find_mmc_device(mmcdev);
+
+	if (!mmc) {
+		printf("invalid mmc device\n");
+		return -1;
+	}
+
+	snprintf(part_name, sizeof(part_name), "%s_%c", part_prefix, slot);
+	snprintf(cmd, sizeof(cmd), "part number mmc %d %s part_num", mmcdev, part_name);
+	if (run_command(cmd, 0)) {
+		printf("Partition %s not found, skip\n", part_name);
+		return -1;
+	}
+
+	snprintf(cmd, sizeof(cmd), "part start mmc %d %s %s", mmcdev, part_name, start_env);
+	if (run_command(cmd, 0) != 0)
+		return -1;
+
+	snprintf(cmd, sizeof(cmd), "part size mmc %d %s %s", mmcdev, part_name, size_env);
+	if (run_command(cmd, 0) != 0)
+		return -1;
+
+	env_partsize = env_get(size_env);
+	if (env_partsize)
+		blkcnt = simple_strtoul(env_partsize, NULL, 16);
+
+	if (blkcnt == 0) {
+		printf("Invalid block count\n");
+		return -1;
+	}
+
+	env_start = env_get(start_env);
+	if (env_start)
+		lbastart = simple_strtoul(env_start, NULL, 16);
+
+	if (lbastart == 0) {
+		printf("Invalid partition start\n");
+		return -1;
+	}
+
+	buff = malloc(blkcnt * MMC_BLK_SIZE);
+	if (!buff) {
+		printf("Failed to allocate ION memory\n");
+		return -1;
+	}
+
+	env_set_hex(addr_env, (u32)(uintptr_t)buff);
+	ret = blk_dread(mmc_get_blk_desc(mmc), lbastart, blkcnt, buff);
+	if (ret != blkcnt) {
+		printf("%d(%d) blocks read: ERROR\n", ret, blkcnt);
+		return -1;
+	}
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_CMD_ABOOTIMG
+static int run_avb_verification(u32 mmcdev, int ab_mode)
+{
+	const char * const requested_partitions[] = {
+		"boot", "dtbo", "vendor_boot", "init_boot", "vendor_kernel_boot", NULL};
+	AvbSlotVerifyResult slot_result;
+	AvbSlotVerifyData *out_data;
+	enum avb_boot_state boot_state;
+	struct AvbOps *avb_ops;
+	char *cmdline;
+	char *extra_args;
+	char slot_suffix[3] = {0}, newbootargs[32] = {0};
+	int ret = -1;
+	bool unlocked = false;
+	int res = CMD_RET_FAILURE;
+
+	sprintf(slot_suffix, "_%s", ab_mode == BOOTSEL_A ? "a" : "b");
+	strcat(newbootargs, "androidboot.slot_suffix=");
+	strcat(newbootargs, slot_suffix);
+	ret = append_bootargs(newbootargs);
+	if (ret)
+		return -1;
+
+	avb_ops = avb_ops_alloc(mmcdev);
+	if (!avb_ops)
+		return log_msg_ret("avb ops", -ENOMEM);
+
+	printf("## Android Verified Boot 2.0 version %s\n",
+	       avb_version_string());
+
+	ret = avb_ops->read_is_device_unlocked(avb_ops, &unlocked);
+	if (ret != AVB_IO_RESULT_OK) {
+		printf("Can't determine device lock state, err = %d\n",
+		       ret);
+		return CMD_RET_FAILURE;
+	}
+
+	slot_result =
+		avb_slot_verify(avb_ops,
+				requested_partitions,
+				slot_suffix,
+				unlocked,
+				AVB_HASHTREE_ERROR_MODE_RESTART_AND_INVALIDATE,
+				&out_data);
+
+	/* LOCKED devices with custom root of trust setup is not supported (YELLOW) */
+	if (slot_result == AVB_SLOT_VERIFY_RESULT_OK) {
+		printf("Verification passed successfully\n");
+		if (unlocked)
+			boot_state = AVB_ORANGE;
+		else
+			boot_state = AVB_GREEN;
+
+		/* export boot state to AVB_BOOTARGS env var */
+		extra_args = avb_set_state(avb_ops, boot_state);
+		if (extra_args)
+			cmdline = append_cmd_line(out_data->cmdline,
+						  extra_args);
+		else
+			cmdline = out_data->cmdline;
+
+		ret = append_bootargs(cmdline);
+		if (ret)
+			goto free_out_data;
+
+		res = CMD_RET_SUCCESS;
+	} else {
+		printf("Verification failed, reason: %s\n",
+		       str_avb_slot_error(slot_result));
+	}
+
+free_out_data:
+	if (out_data)
+		avb_slot_verify_data_free(out_data);
+
+	return res;
+}
+#endif
+
+static int load_android_image(enum boot_type_t boot_type, int ab_mode)
+{
+#ifdef CONFIG_CMD_ABOOTIMG
+	u8 *env_mmcdev, *env_dtbindex;
+	u32 mmcdev = MMC_DEV, dtbindex = ANDROID_DTB_INDEX;
+	char cmd[128], abootimg_cmd[256];
+	char slot = (ab_mode == BOOTSEL_A) ? 'a' : 'b';
+	ulong vloadaddr, bloadaddr;
+	u8 *env_partsize = NULL;
+	u32 bpartsize = 0;
+	struct andr_vnd_boot_img_hdr *vhdr;
+	struct andr_boot_img_hdr_v3 *bhdr;
+	u8 *buff;
+	int ret = -1;
+
+	ret = android_check_bootflow();
+	if (ret)
+		return -1;
+
+	env_mmcdev = env_get("mmc_dev");
+	mmcdev = env_mmcdev ? simple_strtol(env_mmcdev, NULL, 10) : MMC_DEV;
+
+	snprintf(cmd, sizeof(cmd), "mmc dev %d", mmcdev);
+	if (run_command(cmd, 0))
+		return -1;
+
+	ret = load_android_partition(mmcdev, "boot", slot,
+				     "loadaddr", "bootstart", "bootsize");
+	if (ret)
+		return -1;
+
+	env_partsize = env_get("bootsize");
+	if (env_partsize)
+		bpartsize = simple_strtoul(env_partsize, NULL, 16) * MMC_BLK_SIZE;
+
+	bloadaddr = simple_strtoul(env_get("loadaddr"), NULL, 16);
+	bhdr = (struct andr_boot_img_hdr_v3 *)bloadaddr;
+
+	ret = load_android_partition(mmcdev, "vendor_boot", slot,
+				     "vloadaddr", "vbootstart", "vbootsize");
+	if (ret)
+		return -1;
+
+	/* Update DTB, Ramdisk, Kernel address */
+	vloadaddr = simple_strtoul(env_get("vloadaddr"), NULL, 16);
+	vhdr = (struct andr_vnd_boot_img_hdr *)vloadaddr;
+	if (!is_android_vendor_boot_image_header(vhdr)) {
+		printf("Error: Invalid vendor boot image header\n");
+		return -1;
+	}
+
+	buff = malloc(bpartsize * 2 + 0x200000);
+	if (!buff) {
+		printf("Failed to allocate memory\n");
+		return -1;
+	}
+	/* Linux expects a 2MB aligned base address */
+	vhdr->kernel_addr = ALIGN((uintptr_t)buff, 0x200000);
+
+	buff = malloc(bpartsize * 2);
+	if (!buff) {
+		printf("Failed to allocate memory\n");
+		return -1;
+	}
+	vhdr->ramdisk_addr = (uintptr_t)buff;
+
+	buff = malloc(ANDROID_DTB_SIZE);
+	if (!buff) {
+		printf("Failed to allocate memory\n");
+		return -1;
+	}
+	vhdr->dtb_addr = (uintptr_t)buff;
+
+	ret = load_android_partition(mmcdev, "init_boot", slot,
+				     "iloadaddr", "ibootstart", "ibootsize");
+	if (ret)
+		return -1;
+
+	ret = load_android_partition(mmcdev, "vendor_kernel_boot", slot,
+				     "vkloadaddr", "vkbootstart", "vkbootsize");
+	if (ret)
+		return -1;
+
+	snprintf(abootimg_cmd, sizeof(abootimg_cmd),
+		 "abootimg addr $loadaddr $vloadaddr $iloadaddr $vkloadaddr");
+	if (run_command(abootimg_cmd, 0))
+		return -1;
+
+	env_dtbindex = env_get("dtb_index");
+	dtbindex = env_dtbindex ? simple_strtol(env_dtbindex, NULL, 10) : ANDROID_DTB_INDEX;
+
+	snprintf(cmd, sizeof(cmd), "abootimg get dtb --index=%d dtbstart dtbsize",
+		 dtbindex);
+	if (run_command(cmd, 0))
+		return -1;
+
+	env_set_hex("initrd_high", ~0UL);
+
+	ret = run_avb_verification(mmcdev, ab_mode);
+	if (ret)
+		return -1;
+#endif
+	return 0;
+}
+
+static int boot_android_image(void)
+{
+	if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
+		if (run_command("bootm $loadaddr $loadaddr $dtbstart;", 0))
+			return -1;
+	}
+	return 0;
+}
+
+static int load_kernel_image(enum boot_type_t boot_type, int ab_mode,
+			     u32 offset, unsigned char **bootimg_hdr)
+{
+	if (IS_ENABLED(CONFIG_CMD_ABOOTIMG))
+		return load_android_image(boot_type, ab_mode);
+	else
+		return load_syna_image(boot_type, ab_mode, offset, bootimg_hdr);
+}
+
+static int boot_kernel_image(unsigned char *buff)
+{
+	if (IS_ENABLED(CONFIG_CMD_ABOOTIMG))
+		return boot_android_image();
+	else
+		return boot_syna_image(buff);
+}
+
 static enum boot_type_t get_boot_type(const char *name)
 {
 	enum boot_type_t type = BOOT_TYPE_INVALID;
@@ -248,10 +553,8 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 {
 	int ret = CMD_RET_USAGE;
 	enum boot_type_t boot_type = BOOT_TYPE_INVALID;
-	unsigned char *buff =  NULL;
 	unsigned char *bootimg_hdr =  NULL;
 	int ab_mode = BOOTSEL_INVALID;
-	const char *pt_name = NULL;
 	u32 try_ab = 0;
 	u32 offset = 0;
 
@@ -271,7 +574,6 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 			run_command("reset", 0);
 			goto out;
 		}
-		pt_name = (ab_mode == BOOTSEL_A) ?  KERNEL_A_NAME : KERNEL_B_NAME;
 		try_ab = 1;
 		break;
 
@@ -283,7 +585,6 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 				run_command("reset", 0);
 				goto out;
 			}
-			pt_name = (ab_mode == BOOTSEL_A) ?  KERNEL_A_NAME : KERNEL_B_NAME;
 			try_ab = 1;
 		} else if (argc == 3) {
 			offset = simple_strtoul(argv[2], NULL, 16);
@@ -303,14 +604,9 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 		goto out;
 	}
 
-	/* reserve 1M for key */
-	buff = malloc_ion_cacheable(MAX_ANDROID_IMG_SIZE + 0x100000);
-	if (!buff)
-		goto out;
-
 retry_image_load:
-	bootimg_hdr = load_android_image(boot_type, pt_name, offset, buff);
-	if (!bootimg_hdr && try_ab) {
+	ret = load_kernel_image(boot_type, ab_mode, offset, &bootimg_hdr);
+	if (ret && try_ab) {
 		if (try_abmode(ab_mode)) {
 			printf("Invalid slot_%s boot image! reset to backup image...\n",
 			       ab_mode ? "b" : "a");
@@ -322,13 +618,10 @@ retry_image_load:
 		}
 	}
 
-	boot_android_image(bootimg_hdr);
+	boot_kernel_image(bootimg_hdr);
 	ret = 0;
 
 out:
-	if (buff)
-		free_ion_cacheable(buff);
-
 	return ret;
 }
 
