@@ -33,6 +33,8 @@
 #include <spi.h>
 #include <spi_flash.h>
 #include <mtd.h>
+#include <bcb.h>
+#include <version.h>
 #include "spinand_drv.h"
 #include "genimg.h"
 #include "misc_syna.h"
@@ -44,6 +46,8 @@
 #define BOOTCTRL_HAL_FTS_LENGH		0x20
 #define MISC_BOOT_CONTROL_VERSION	2
 #define MAX_GPT_ENTRY			64
+#define BCB_FIELD_COMMAND_SZ		32
+#define BCB_PART_NAME			"misc"
 
 typedef struct syna_slot_metadata {
 	uint8_t priority : 4;
@@ -83,6 +87,7 @@ struct emmc_part {
 };
 
 static struct emmc_part *emmc_part_table;
+static u32 _boot_mode = -1;
 
 static bool is_valid_bootctrl(void *p_bootctrl)
 {
@@ -508,6 +513,151 @@ int try_abmode(int abmode_sel)
 	}
 
 	return 1;
+}
+
+int append_bootargs(const char *args)
+{
+	int len = 0;
+	char *bootargs = env_get("bootargs");
+
+	if (bootargs)
+		len += strlen(bootargs);
+
+	len += strlen(args) + (len ? 1 : 0); /* +1 for extra space */
+
+	char *newbootargs = malloc(len + 1); /* +1 for the '\0' */
+
+	if (!newbootargs) {
+		printf("Error: malloc failed!\n");
+		return -ENOMEM;
+	}
+	*newbootargs = '\0'; /* set to Null in case no components below are present */
+
+	if (bootargs)
+		strcpy(newbootargs, bootargs);
+
+	if (*newbootargs) /* If there is something in newbootargs, a space is needed */
+		strcat(newbootargs, " ");
+	strcat(newbootargs, args);
+
+	env_set("bootargs", newbootargs);
+	free(newbootargs);
+
+	return 0;
+}
+
+enum android_boot_mode android_read_bootmode(void)
+{
+	return _boot_mode;
+}
+
+void android_write_bootmode(enum android_boot_mode bootmode)
+{
+	_boot_mode = bootmode;
+}
+
+int android_check_bootflow(void)
+{
+	if (IS_ENABLED(CONFIG_CMD_ABOOTIMG)) {
+		char cmd[128], command[BCB_FIELD_COMMAND_SZ];
+		int ret = -1;
+		char newbootargs[128] = {0};
+		struct blk_desc *desc;
+		struct disk_partition misc;
+		int mmc_dev = get_mmc_active_dev();
+		struct mmc *mmc = find_mmc_device(mmc_dev);
+
+		if (!mmc) {
+			printf("invalid mmc device\n");
+			return ret;
+		}
+
+		desc = blk_get_dev("mmc", mmc_dev);
+		if (!desc || desc->type == DEV_TYPE_UNKNOWN) {
+			printf("invalid mmc device\n");
+			return ret;
+		}
+
+		/*
+		 * bcb_find_partition_and_load() will print errors to stdout
+		 * if BCB_PART_NAME is not found. To avoid that, check if the
+		 * partition exists first.
+		 */
+		ret = part_get_info_by_name(desc, BCB_PART_NAME, &misc);
+		if (ret < 0)
+			return ret;
+
+		ret = bcb_find_partition_and_load("mmc", desc->devnum, BCB_PART_NAME);
+		if (ret < 0)
+			return ret;
+
+		ret = bcb_get(BCB_FIELD_COMMAND, command, sizeof(command));
+		if (ret < 0)
+			return ret;
+
+		if (!strcmp("bootonce-bootloader", command)) {
+			env_set("android_boot_mode", "bootloader");
+			android_write_bootmode(ANDROID_BOOT_MODE_BOOTLOADER);
+			printf("boot mode:%s\n", "fastboot");
+		} else if (!strcmp("boot-fastboot", command)) {
+			env_set("android_boot_mode", "recovery");
+			android_write_bootmode(ANDROID_BOOT_MODE_RECOVERY);
+			printf("boot mode:%s\n", "fastbootd");
+		} else if (!strcmp("boot-recovery", command)) {
+			env_set("android_boot_mode", "recovery");
+			android_write_bootmode(ANDROID_BOOT_MODE_RECOVERY);
+			printf("boot mode:%s\n", "recovery");
+		} else if (!strcmp("boot-quiescent", command)) {
+			env_set("android_boot_mode", "quiescent");
+			android_write_bootmode(ANDROID_BOOT_MODE_QUIESCENT);
+			printf("boot mode:%s\n", "quiescent");
+			sprintf(newbootargs, "androidboot.quiescent=1");
+			ret = append_bootargs(newbootargs);
+			if (ret)
+				return ret;
+		} else {
+			env_set_hex("android_boot_mode", ANDROID_BOOT_MODE_NORMAL);
+			android_write_bootmode(ANDROID_BOOT_MODE_NORMAL);
+			printf("boot mode:%s\n", "normal");
+		}
+
+		sprintf(newbootargs, "androidboot.bootloader=%s", PLAIN_VERSION);
+		ret = append_bootargs(newbootargs);
+		if (ret)
+			return ret;
+
+		if (android_read_bootmode() == ANDROID_BOOT_MODE_NORMAL ||
+		    android_read_bootmode() == ANDROID_BOOT_MODE_QUIESCENT) {
+			sprintf(newbootargs, "androidboot.force_normal_boot=1");
+			ret = append_bootargs(newbootargs);
+			if (ret)
+				return ret;
+		}
+
+		if (android_read_bootmode() == ANDROID_BOOT_MODE_BOOTLOADER ||
+		    android_read_bootmode() == ANDROID_BOOT_MODE_QUIESCENT ||
+		    android_read_bootmode() == ANDROID_BOOT_MODE_RECOVERY) {
+			/* Clear BCB */
+			memset(command, 0, sizeof(command));
+			ret = bcb_set(BCB_FIELD_COMMAND, command);
+			if (ret < 0)
+				return ret;
+			ret = bcb_store();
+			if (ret < 0)
+				return ret;
+		}
+
+		if (android_read_bootmode() == ANDROID_BOOT_MODE_BOOTLOADER) {
+			sprintf(cmd, "fastboot usb 0");
+			while (1)
+				if (run_command(cmd, 0))
+					run_command("reset", 0);
+		}
+
+		return ret;
+	}
+
+	return 0;
 }
 
 static struct part_driver *f_part_driver_lookup_type(struct blk_desc *dev_desc)

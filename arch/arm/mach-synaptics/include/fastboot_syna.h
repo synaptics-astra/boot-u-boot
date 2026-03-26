@@ -29,6 +29,14 @@
 #define BOOTSEL_DEFAULT			BOOTSEL_A
 #define BOOTSEL_INVALID			0xff
 
+enum android_boot_mode {
+	ANDROID_BOOT_MODE_NORMAL = 0,
+	ANDROID_BOOT_MODE_RECOVERY,
+	ANDROID_BOOT_MODE_BOOTLOADER,
+	ANDROID_BOOT_MODE_FASTBOOT,
+	ANDROID_BOOT_MODE_QUIESCENT,
+};
+
 int get_current_slot(void);
 int try_abmode(int abmode_sel);
 
@@ -43,3 +51,6 @@ int f_mmc_get_part_index(int mmc_dev, const char *part_name);
 struct mtd_info *fb_spi_setup_mtd_dev(void);
 int syna_mtdparts_get_info_by_name(struct mtd_info *mtd, const char *name,
 				   struct disk_partition *info);
+enum android_boot_mode android_read_bootmode(void);
+int append_bootargs(const char *args);
+int android_check_bootflow(void);
