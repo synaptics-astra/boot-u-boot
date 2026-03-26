@@ -16,6 +16,7 @@
 static ulong _abootimg_addr = -1;
 static ulong _ainit_bootimg_addr = -1;
 static ulong _avendor_bootimg_addr = -1;
+static ulong _avendor_kernel_bootimg_addr = -1;
 
 ulong get_abootimg_addr(void)
 {
@@ -32,6 +33,11 @@ ulong get_ainit_bootimg_addr(void)
 	return _ainit_bootimg_addr;
 }
 
+void set_ainit_bootimg_addr(ulong addr)
+{
+	_ainit_bootimg_addr = addr;
+}
+
 ulong get_avendor_bootimg_addr(void)
 {
 	return _avendor_bootimg_addr;
@@ -40,6 +46,16 @@ ulong get_avendor_bootimg_addr(void)
 void set_avendor_bootimg_addr(ulong addr)
 {
 	_avendor_bootimg_addr = addr;
+}
+
+ulong get_avendor_kernel_bootimg_addr(void)
+{
+	return _avendor_kernel_bootimg_addr;
+}
+
+void set_avendor_kernel_bootimg_addr(ulong addr)
+{
+	_avendor_kernel_bootimg_addr = addr;
 }
 
 static int abootimg_get_ver(int argc, char *const argv[])
@@ -95,7 +111,7 @@ static int abootimg_get_dtb_load_addr(int argc, char *const argv[])
 		return CMD_RET_USAGE;
 	struct andr_image_data img_data = {0};
 	const struct andr_boot_img_hdr_v0 *hdr;
-	const struct andr_vnd_boot_img_hdr *vhdr;
+	const struct andr_vnd_boot_img_hdr *vhdr = NULL;
 
 	hdr = map_sysmem(abootimg_addr(), sizeof(*hdr));
 	if (get_avendor_bootimg_addr() != -1)
@@ -195,7 +211,7 @@ static int do_abootimg_addr(struct cmd_tbl *cmdtp, int flag, int argc,
 	char *endp;
 	ulong img_addr;
 
-	if (argc < 2 || argc > 4)
+	if (argc < 2 || argc > 5)
 		return CMD_RET_USAGE;
 
 	img_addr = hextoul(argv[1], &endp);
@@ -207,7 +223,7 @@ static int do_abootimg_addr(struct cmd_tbl *cmdtp, int flag, int argc,
 	_abootimg_addr = img_addr;
 
 	if (argc > 2) {
-		img_addr = simple_strtoul(argv[2], &endp, 16);
+		img_addr = hextoul(argv[2], &endp);
 		if (*endp != '\0') {
 			printf("Error: Wrong vendor_boot image address\n");
 			return CMD_RET_FAILURE;
@@ -216,14 +232,24 @@ static int do_abootimg_addr(struct cmd_tbl *cmdtp, int flag, int argc,
 		_avendor_bootimg_addr = img_addr;
 	}
 
-	if (argc == 4) {
-		img_addr = simple_strtoul(argv[3], &endp, 16);
+	if (argc > 3) {
+		img_addr = hextoul(argv[3], &endp);
 		if (*endp != '\0') {
 			printf("Error: Wrong init_boot image address\n");
 			return CMD_RET_FAILURE;
 		}
 
 		_ainit_bootimg_addr = img_addr;
+	}
+
+	if (argc > 4) {
+		img_addr = hextoul(argv[4], &endp);
+		if (*endp != '\0') {
+			printf("Error: Wrong vendor_kernel_boot image address\n");
+			return CMD_RET_FAILURE;
+		}
+
+		_avendor_kernel_bootimg_addr = img_addr;
 	}
 
 	return CMD_RET_SUCCESS;
@@ -269,7 +295,7 @@ static int do_abootimg_dump(struct cmd_tbl *cmdtp, int flag, int argc,
 }
 
 static struct cmd_tbl cmd_abootimg_sub[] = {
-	U_BOOT_CMD_MKENT(addr, 4, 1, do_abootimg_addr, "", ""),
+	U_BOOT_CMD_MKENT(addr, 5, 1, do_abootimg_addr, "", ""),
 	U_BOOT_CMD_MKENT(dump, 2, 1, do_abootimg_dump, "", ""),
 	U_BOOT_CMD_MKENT(get, 5, 1, do_abootimg_get, "", ""),
 };
@@ -297,7 +323,7 @@ static int do_abootimg(struct cmd_tbl *cmdtp, int flag, int argc,
 U_BOOT_CMD(
 	abootimg, CONFIG_SYS_MAXARGS, 0, do_abootimg,
 	"manipulate Android Boot Image",
-	"addr <boot_img_addr> [<vendor_boot_img_addr> [<init_boot_img_addr>]]\n"
+	"addr <boot_img_addr> [<vendor_boot_img_addr> [<init_boot_img_addr>]] [<vendor_kernel_boot_img_addr>]]\n"
 	"    - set the address in RAM where boot image is located\n"
 	"      ($loadaddr is used by default)\n"
 	"abootimg dump dtb\n"

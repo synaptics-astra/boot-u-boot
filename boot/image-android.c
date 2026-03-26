@@ -13,6 +13,10 @@
 #include <mapmem.h>
 #include <linux/libfdt.h>
 
+/* Boot mode constants */
+#define BOOTMODE_NORMAL 0
+#define BOOTMODE_RECOVERY 1
+
 #define ANDROID_IMAGE_DEFAULT_KERNEL_ADDR	0x10008000
 #define ANDROID_IMAGE_DEFAULT_RAMDISK_ADDR	0x11000000
 
@@ -62,10 +66,23 @@ __weak ulong get_avendor_bootimg_addr(void)
 	return -1;
 }
 
+__weak ulong get_ainit_bootimg_addr(void)
+{
+	return -1;
+}
+
+__weak ulong get_avendor_kernel_bootimg_addr(void)
+{
+	return -1;
+}
+
 static void android_boot_image_v3_v4_parse_hdr(const struct andr_boot_img_hdr_v3 *hdr,
 					       struct andr_image_data *data)
 {
 	ulong end;
+
+	if (!hdr)
+		return;
 
 	data->kcmdline = hdr->cmdline;
 	data->header_version = hdr->header_version;
@@ -95,6 +112,8 @@ static void android_vendor_boot_image_v3_v4_parse_hdr(const struct andr_vnd_boot
 {
 	ulong end;
 
+	if (!hdr)
+		return;
 	/*
 	 * The header takes a full page, the remaining components are aligned
 	 * on page boundary.
@@ -107,11 +126,11 @@ static void android_vendor_boot_image_v3_v4_parse_hdr(const struct andr_vnd_boot
 	data->dtb_load_addr = hdr->dtb_addr;
 	data->bootconfig_size = hdr->bootconfig_size;
 	end = (ulong)hdr;
-	end += hdr->page_size;
+	end += ALIGN(hdr->header_size, hdr->page_size);
 	if (hdr->vendor_ramdisk_size) {
 		data->vendor_ramdisk_ptr = end;
 		data->vendor_ramdisk_size = hdr->vendor_ramdisk_size;
-		data->ramdisk_size += hdr->vendor_ramdisk_size;
+		/* ramdisk_size will be accumulated later in android_image_get_ramdisk */
 		end += ALIGN(hdr->vendor_ramdisk_size, hdr->page_size);
 	}
 
@@ -121,13 +140,6 @@ static void android_vendor_boot_image_v3_v4_parse_hdr(const struct andr_vnd_boot
 	end += ALIGN(hdr->dtb_size, hdr->page_size);
 	end += ALIGN(hdr->vendor_ramdisk_table_size, hdr->page_size);
 	data->bootconfig_addr = end;
-	if (hdr->bootconfig_size) {
-		data->bootconfig_size += add_trailer(data->bootconfig_addr,
-						     data->bootconfig_size);
-		data->ramdisk_size += data->bootconfig_size;
-	}
-	end += ALIGN(data->bootconfig_size, hdr->page_size);
-	data->vendor_boot_img_total_size = end - (ulong)hdr;
 }
 
 static void android_boot_image_v0_v1_v2_parse_hdr(const struct andr_boot_img_hdr_v0 *hdr,
@@ -185,14 +197,38 @@ static void android_boot_image_v0_v1_v2_parse_hdr(const struct andr_boot_img_hdr
 bool android_image_get_data(const void *boot_hdr, const void *vendor_boot_hdr,
 			    struct andr_image_data *data)
 {
-	if (!boot_hdr || !data) {
-		printf("boot_hdr or data params can't be NULL\n");
+	if (!data) {
+		printf("data param can't be NULL\n");
+		return false;
+	}
+
+	if (!boot_hdr && vendor_boot_hdr) {
+		if (!is_android_vendor_boot_image_header(vendor_boot_hdr)) {
+			printf("Incorrect vendor boot image header\n");
+			return false;
+		}
+		memset(data, 0, sizeof(*data));
+		android_vendor_boot_image_v3_v4_parse_hdr(vendor_boot_hdr, data);
+		return true;
+	}
+
+	if (!boot_hdr) {
+		printf("boot_hdr param can't be NULL when vendor_boot_hdr is NULL\n");
 		return false;
 	}
 
 	if (!is_android_boot_image_header(boot_hdr)) {
 		printf("Incorrect boot image header\n");
 		return false;
+	}
+
+	if (boot_hdr && !vendor_boot_hdr) {
+		memset(data, 0, sizeof(*data));
+		if (((struct andr_boot_img_hdr_v0 *)boot_hdr)->header_version > 2)
+			android_boot_image_v3_v4_parse_hdr(boot_hdr, data);
+		else
+			android_boot_image_v0_v1_v2_parse_hdr(boot_hdr, data);
+		return true;
 	}
 
 	if (((struct andr_boot_img_hdr_v0 *)boot_hdr)->header_version > 2) {
@@ -206,8 +242,6 @@ bool android_image_get_data(const void *boot_hdr, const void *vendor_boot_hdr,
 		}
 		android_boot_image_v3_v4_parse_hdr(boot_hdr, data);
 		android_vendor_boot_image_v3_v4_parse_hdr(vendor_boot_hdr, data);
-	} else {
-		android_boot_image_v0_v1_v2_parse_hdr(boot_hdr, data);
 	}
 
 	return true;
@@ -411,17 +445,67 @@ ulong android_image_get_kcomp(const void *hdr,
 		return image_decomp_type(p, sizeof(u32));
 }
 
+static u32 combine_ramdisk(const struct andr_vnd_boot_img_hdr *vhdr,
+			   void *dest, int bootmode)
+{
+	u32 i;
+	u32 total_copied = 0;
+	u32 page_size = vhdr->page_size;
+	u32 header_size = vhdr->header_size;
+	u32 vendor_ramdisk_size = vhdr->vendor_ramdisk_size;
+	u32 dtb_size = vhdr->dtb_size;
+	u32 vendor_ramdisk_table_entry_num = vhdr->vendor_ramdisk_table_entry_num;
+	const u8 *img = (const u8 *)vhdr;
+	u32 comp_offset;
+
+	if (!vendor_ramdisk_size || !vendor_ramdisk_table_entry_num)
+		return 0;
+
+	ulong table_offset = ALIGN(header_size, page_size) +
+			     ALIGN(vendor_ramdisk_size, page_size) +
+			     ALIGN(dtb_size, page_size);
+	struct vendor_ramdisk_table_entry_v4 *table_ptr =
+		(struct vendor_ramdisk_table_entry_v4 *)(img + table_offset);
+
+	for (i = 0; i < vendor_ramdisk_table_entry_num; i++) {
+		if (table_ptr[i].ramdisk_type == VENDOR_RAMDISK_TYPE_PLATFORM ||
+		    (table_ptr[i].ramdisk_type == VENDOR_RAMDISK_TYPE_RECOVERY &&
+		    bootmode == BOOTMODE_RECOVERY)) {
+			comp_offset = ALIGN(header_size, page_size) + table_ptr[i].ramdisk_offset;
+			memcpy(dest + total_copied, img + comp_offset, table_ptr[i].ramdisk_size);
+			total_copied += table_ptr[i].ramdisk_size;
+		}
+	}
+
+	return total_copied;
+}
+
 int android_image_get_ramdisk(const void *hdr, const void *vendor_boot_img,
 			      ulong *rd_data, ulong *rd_len)
 {
 	struct andr_image_data img_data = {0};
 	ulong ramdisk_ptr;
+	const void *vk_boot_img = NULL;
+	struct andr_vnd_boot_img_hdr *vhdr = (struct andr_vnd_boot_img_hdr *)vendor_boot_img;
+	int bootmode = BOOTMODE_NORMAL;
+	const char *bootmode_str;
+	u32 copied;
+
+	/* Try to get boot mode from environment, default to normal */
+	bootmode_str = env_get("android_boot_mode");
+	if (bootmode_str) {
+		if (!strcmp(bootmode_str, "recovery"))
+			bootmode = BOOTMODE_RECOVERY;
+	}
 
 	if (!android_image_get_data(hdr, vendor_boot_img, &img_data))
 		return -EINVAL;
 
-	if (!img_data.ramdisk_size)
-		return -ENOENT;
+	/* Get vendor_kernel_boot image address if available */
+	if (IS_ENABLED(CONFIG_CMD_ABOOTIMG) &&
+	    get_avendor_kernel_bootimg_addr() != (ulong)-1)
+		vk_boot_img = map_sysmem(get_avendor_kernel_bootimg_addr(), 0);
+
 	/*
 	 * Android tools can generate a boot.img with default load address
 	 * or 0, even though it doesn't really make a lot of sense, and it
@@ -435,23 +519,71 @@ int android_image_get_ramdisk(const void *hdr, const void *vendor_boot_img,
 			ramdisk_ptr = env_get_ulong("ramdisk_addr_r", 16, 0);
 			if (!ramdisk_ptr) {
 				printf("Invalid ramdisk_addr_r to copy ramdisk into\n");
+				if (vk_boot_img)
+					unmap_sysmem(vk_boot_img);
 				return -EINVAL;
 			}
 		} else {
 			ramdisk_ptr = img_data.ramdisk_addr;
 		}
+
 		*rd_data = ramdisk_ptr;
-		memcpy((void *)(ramdisk_ptr), (void *)img_data.vendor_ramdisk_ptr,
-		       img_data.vendor_ramdisk_size);
-		ramdisk_ptr += img_data.vendor_ramdisk_size;
-		memcpy((void *)(ramdisk_ptr), (void *)img_data.ramdisk_ptr,
-		       img_data.boot_ramdisk_size);
-		ramdisk_ptr += img_data.boot_ramdisk_size;
-		if (img_data.bootconfig_size) {
-			memcpy((void *)
-			       (ramdisk_ptr), (void *)img_data.bootconfig_addr,
-			       img_data.bootconfig_size);
+		/* Copy vendor_boot vendor ramdisk components */
+		if (img_data.vendor_ramdisk_size && vendor_boot_img) {
+			copied = combine_ramdisk(vendor_boot_img,
+						 (void *)ramdisk_ptr, bootmode);
+			ramdisk_ptr += copied;
+			img_data.ramdisk_size += copied;
 		}
+		/* Copy vendor_kernel_boot vendor ramdisk components if available */
+		if (vk_boot_img) {
+			struct andr_image_data vk_img_data = {0};
+
+			if (android_image_get_data(NULL, vk_boot_img, &vk_img_data)) {
+				if (vk_img_data.vendor_ramdisk_size > 0) {
+					copied = combine_ramdisk(vk_boot_img,
+								 (void *)ramdisk_ptr,
+								 bootmode);
+					ramdisk_ptr += copied;
+					img_data.ramdisk_size += copied;
+				}
+			}
+		}
+		/* Copy boot ramdisk */
+		if (img_data.boot_ramdisk_size > 0) {
+			memcpy((void *)(ramdisk_ptr), (void *)img_data.ramdisk_ptr,
+			       img_data.boot_ramdisk_size);
+			ramdisk_ptr += img_data.boot_ramdisk_size;
+			img_data.ramdisk_size += img_data.boot_ramdisk_size;
+		}
+		/* Copy init_boot ramdisk */
+		if (get_ainit_bootimg_addr() != (ulong)-1) {
+			const void *init_boot_img = map_sysmem(get_ainit_bootimg_addr(), 0);
+			struct andr_image_data init_img_data = {0};
+
+			if (android_image_get_data(init_boot_img, NULL, &init_img_data)) {
+				if (init_img_data.ramdisk_size > 0) {
+					memcpy((void *)(ramdisk_ptr),
+					       (void *)init_img_data.ramdisk_ptr,
+					       init_img_data.boot_ramdisk_size);
+					ramdisk_ptr += init_img_data.boot_ramdisk_size;
+					img_data.ramdisk_size += init_img_data.boot_ramdisk_size;
+				}
+			}
+			unmap_sysmem(init_boot_img);
+		}
+
+		if (img_data.bootconfig_size) {
+			memcpy((void *)ramdisk_ptr, (void *)img_data.bootconfig_addr,
+			       img_data.bootconfig_size);
+
+			img_data.bootconfig_size += add_trailer(ramdisk_ptr,
+								img_data.bootconfig_size);
+			img_data.ramdisk_size += img_data.bootconfig_size;
+		}
+		img_data.vendor_boot_img_total_size =
+			img_data.bootconfig_addr + ALIGN(img_data.bootconfig_size, vhdr->page_size)
+							- (ulong)vendor_boot_img;
 	} else {
 		/* Ramdisk can be used in-place, use current ptr */
 		if (img_data.ramdisk_addr == 0 ||
@@ -464,6 +596,9 @@ int android_image_get_ramdisk(const void *hdr, const void *vendor_boot_img,
 			       img_data.ramdisk_size);
 		}
 	}
+
+	if (vk_boot_img)
+		unmap_sysmem(vk_boot_img);
 
 	printf("RAM disk load addr 0x%08lx size %u KiB\n",
 	       *rd_data, DIV_ROUND_UP(img_data.ramdisk_size, 1024));
@@ -563,10 +698,12 @@ exit:
  * @hdr_addr: Boot image header address
  * @vhdr_addr: Vendor Boot image header address
  * @addr: Will contain the address of DTB area in boot image
+ * @data: Will update with DTB image size if DTB is found in vendor_kernel_boot or vendor_boot image
  *
  * Return: true on success or false on fail.
  */
-static bool android_image_get_dtb_img_addr(ulong hdr_addr, ulong vhdr_addr, ulong *addr)
+static bool android_image_get_dtb_img_addr(ulong hdr_addr, ulong vhdr_addr, ulong *addr,
+					   struct andr_image_data *data)
 {
 	const struct andr_boot_img_hdr_v0 *hdr;
 	const struct andr_vnd_boot_img_hdr *v_hdr;
@@ -604,19 +741,50 @@ static bool android_image_get_dtb_img_addr(ulong hdr_addr, ulong vhdr_addr, ulon
 	}
 
 	if (hdr->header_version > 2) {
+		const struct andr_vnd_boot_img_hdr *vk_hdr = NULL;
+		ulong vk_boot_img;
+
+		if (!data)
+			goto exit;
+
 		v_hdr = map_sysmem(vhdr_addr, sizeof(*v_hdr));
-		if (!v_hdr->dtb_size) {
-			printf("Error: dtb_size is 0\n");
-			ret = false;
+		vk_boot_img = get_avendor_kernel_bootimg_addr();
+		if (vk_boot_img != (ulong)-1) {
+			vk_hdr = map_sysmem(vk_boot_img, sizeof(*vk_hdr));
+			if (is_android_vendor_boot_image_header(vk_hdr) &&
+			    vk_hdr->dtb_size > 0) {
+				dtb_img_addr = vk_boot_img;
+				dtb_img_addr += ALIGN(vk_hdr->header_size, vk_hdr->page_size);
+				if (vk_hdr->vendor_ramdisk_size)
+					dtb_img_addr += ALIGN(vk_hdr->vendor_ramdisk_size,
+							      vk_hdr->page_size);
+				*addr = v_hdr->dtb_addr;
+				memcpy((void *)*addr, (void *)dtb_img_addr, vk_hdr->dtb_size);
+				data->dtb_size = vk_hdr->dtb_size;
+				if (vk_hdr)
+					unmap_sysmem(vk_hdr);
+				unmap_sysmem(v_hdr);
+				goto exit;
+			}
+			if (vk_hdr)
+				unmap_sysmem(vk_hdr);
+			vk_hdr = NULL;
+		}
+
+		if (v_hdr->dtb_size > 0) {
+			dtb_img_addr = vhdr_addr;
+			dtb_img_addr += ALIGN(v_hdr->header_size, v_hdr->page_size);
+			if (v_hdr->vendor_ramdisk_size)
+				dtb_img_addr += ALIGN(v_hdr->vendor_ramdisk_size, v_hdr->page_size);
+			*addr = v_hdr->dtb_addr;
+			memcpy((void *)*addr, (void *)dtb_img_addr, v_hdr->dtb_size);
+			data->dtb_size = v_hdr->dtb_size;
 			unmap_sysmem(v_hdr);
 			goto exit;
 		}
-		/* Calculate the address of DTB area in boot image */
-		dtb_img_addr = vhdr_addr;
-		dtb_img_addr += v_hdr->page_size;
-		if (v_hdr->vendor_ramdisk_size)
-			dtb_img_addr += ALIGN(v_hdr->vendor_ramdisk_size, v_hdr->page_size);
-		*addr = dtb_img_addr;
+
+		printf("Error: dtb_size is 0\n");
+		ret = false;
 		unmap_sysmem(v_hdr);
 		goto exit;
 	}
@@ -643,7 +811,7 @@ bool android_image_get_dtb_by_index(ulong hdr_addr, ulong vendor_boot_img,
 {
 	struct andr_image_data img_data;
 	const struct andr_boot_img_hdr_v0 *hdr;
-	const struct andr_vnd_boot_img_hdr *vhdr;
+	const struct andr_vnd_boot_img_hdr *vhdr = NULL;
 
 	hdr = map_sysmem(hdr_addr, sizeof(*hdr));
 	if (vendor_boot_img != -1)
@@ -663,7 +831,8 @@ bool android_image_get_dtb_by_index(ulong hdr_addr, ulong vendor_boot_img,
 	ulong dtb_addr;		/* address of DTB blob with specified index  */
 	u32 i;			/* index iterator */
 
-	if (android_image_get_dtb_img_addr(hdr_addr, vendor_boot_img, &dtb_img_addr) == false)
+	if (android_image_get_dtb_img_addr(hdr_addr, vendor_boot_img,
+					   &dtb_img_addr, &img_data) == false)
 		return false;
 
 	/* Check if DTB area of boot image is in DTBO format */
@@ -821,7 +990,7 @@ bool android_image_print_dtb_contents(ulong hdr_addr)
 	ulong dtb_addr;		/* address of DTB blob with specified index  */
 	u32 i;			/* index iterator */
 
-	res = android_image_get_dtb_img_addr(hdr_addr, 0, &dtb_img_addr);
+	res = android_image_get_dtb_img_addr(hdr_addr, 0, &dtb_img_addr, NULL);
 	if (!res)
 		return false;
 

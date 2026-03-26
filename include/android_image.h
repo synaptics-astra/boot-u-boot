@@ -33,6 +33,16 @@
 				BOOTCONFIG_SIZE_SIZE + \
 				BOOTCONFIG_CHECKSUM_SIZE
 
+/* Vendor ramdisk table entry for Android boot image v4 */
+#define VENDOR_RAMDISK_NAME_SIZE 32
+#define VENDOR_RAMDISK_TABLE_ENTRY_BOARD_ID_SIZE 16
+
+/* Vendor ramdisk type constants */
+#define VENDOR_RAMDISK_TYPE_NONE 0
+#define VENDOR_RAMDISK_TYPE_PLATFORM 1
+#define VENDOR_RAMDISK_TYPE_RECOVERY 2
+#define VENDOR_RAMDISK_TYPE_DLKM 3
+
 struct andr_boot_img_hdr_v3 {
 	u8 magic[ANDR_BOOT_MAGIC_SIZE];
 
@@ -356,6 +366,14 @@ struct andr_image_data {
 	u32 header_version;  /* version of the boot image header */
 	u32 boot_img_total_size;  /* boot image size */
 	u32 vendor_boot_img_total_size;  /* vendor boot image size */
+};
+
+struct vendor_ramdisk_table_entry_v4 {
+	u32 ramdisk_size;
+	u32 ramdisk_offset;
+	u32 ramdisk_type;
+	u8 ramdisk_name[VENDOR_RAMDISK_NAME_SIZE];
+	u32 board_id[VENDOR_RAMDISK_TABLE_ENTRY_BOARD_ID_SIZE];
 };
 
 #endif
