@@ -33,6 +33,7 @@
 #include <asm/io.h>
 #include <linux/libfdt.h>
 #include <string.h>
+#include "linux/kconfig.h"
 #include "mem_region_userdata.h"
 #include "mem_init.h"
 #include "Galois_memmap.h"
@@ -314,7 +315,8 @@ static void setup_rootfs(char *bootargs)
 		return;
 
 	/*update rootfs partition*/
-	strcat(bootargs, ROOTFS_CONFIG_LINE);
+	if (!IS_ENABLED(CONFIG_CMD_ABOOTIMG))
+		strcat(bootargs, ROOTFS_CONFIG_LINE);
 
 	if (get_mmc_partition_type(mmc_dev)) {
 		hwpart = f_mmc_get_hwpart_from_table(slot == BOOTSEL_A ? ROOTFS_A : ROOTFS_B);
