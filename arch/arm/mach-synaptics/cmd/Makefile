@@ -29,4 +29,5 @@ obj-$(CONFIG_SYNA_SUBOOT) += syna_boot.o
 obj-$(CONFIG_CMD_SYNA_USBLOAD) += usbload.o
 obj-$(CONFIG_CMD_SYNA_FDT_UPDATE) += fdt_update.o
 obj-$(CONFIG_CMD_SYNA_OTP) += otp.o
+obj-$(CONFIG_CMD_SYNA_SRAM_BUF) += sram_buf.o
 obj-$(CONFIG_CMD_SYNA_MTDPARTS) += syna_mtdparts.o

@@ -24,6 +24,10 @@ config CMD_SYNA_OTP
 	bool "Enable OTP operations"
 	depends on SYNA_SUBOOT
 
+config CMD_SYNA_SRAM_BUF
+	bool "Enable SRAM buffer operations"
+	depends on SYNA_SUBOOT && TARGET_PLATYPUS
+
 config CMD_SYNA_MTDPARTS
 	bool "Enable MTD parts in version table format"
 	depends on (SYNA_SPI_SUBOOT || SYNA_SPINAND_SUBOOT)
