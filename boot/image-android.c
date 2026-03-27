@@ -337,7 +337,8 @@ int android_image_get_kernel(const void *hdr,
 		} else {
 			*os_data = img_data.kernel_ptr;
 #ifdef CONFIG_ARCH_SYNAPTICS
-			*os_data += 0x80;
+			if (!IS_ENABLED(CONFIG_CMD_ABOOTIMG))
+				*os_data += 0x80;
 #endif
 		}
 	}
@@ -399,7 +400,8 @@ ulong android_image_get_kcomp(const void *hdr,
 
 	p = (const void *)img_data.kernel_ptr;
 #ifdef CONFIG_ARCH_SYNAPTICS
-	p += 0x80;
+	if (!IS_ENABLED(CONFIG_CMD_ABOOTIMG))
+		p += 0x80;
 #endif
 	if (image_get_magic((struct legacy_img_hdr *)p) == IH_MAGIC)
 		return image_get_comp((struct legacy_img_hdr *)p);
