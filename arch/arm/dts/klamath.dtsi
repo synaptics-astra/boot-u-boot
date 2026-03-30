@@ -180,6 +180,57 @@
 				status = "disabled";
 			};
 
+			sm_gpio0: gpio@e5038000 {
+				compatible = "snps,dw-apb-gpio";
+				dev_name = "gpio_sm_0";
+				reg = <0xe5038000 0x400>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				portc: gpio-port@0 {
+					compatible = "snps,dw-apb-gpio-port";
+					bank-name = "portc";
+					gpio-controller;
+					#gpio-cells = <2>;
+					snps,nr-gpios = <16>;
+					reg = <0>;
+				};
+			};
+
+			sm_gpio1: gpio@e5039000 {
+				compatible = "snps,dw-apb-gpio";
+				dev_name = "gpio_sm_1";
+				reg = <0xe5039000 0x400>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				portd: gpio-port@0 {
+					compatible = "snps,dw-apb-gpio-port";
+					bank-name = "portd";
+					gpio-controller;
+					#gpio-cells = <2>;
+					snps,nr-gpios = <8>;
+					reg = <0>;
+				};
+			};
+
+			sm_gpio2: gpio@e503a000 {
+				compatible = "snps,dw-apb-gpio";
+				dev_name = "gpio_sm_2";
+				reg = <0xe503a000 0x400>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				porte: gpio-port@0 {
+					compatible = "snps,dw-apb-gpio-port";
+					bank-name = "porte";
+					gpio-controller;
+					#gpio-cells = <2>;
+					snps,nr-gpios = <8>;
+					reg = <0>;
+				};
+			};
+
 			sm_gpio3: gpio@e503b000 {
 				compatible = "snps,dw-apb-gpio";
 				dev_name = "gpio_sm_3";
@@ -188,9 +239,11 @@
 				#size-cells = <0>;
 
 				portf: gpio-port@0 {
+					compatible = "snps,dw-apb-gpio-port";
+					bank-name = "portf";
 					gpio-controller;
 					#gpio-cells = <2>;
-					ngpios = <8>;
+					snps,nr-gpios = <8>;
 					reg = <0>;
 				};
 			};
@@ -327,6 +380,46 @@
 			     <0xf7e5c000 0x2000>,
 			     <0xf7e5e000 0x2000>;
 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+		};
+
+		gpio0: gpio@f7f07000 {
+			compatible = "snps,dw-apb-gpio";
+			dev_name = "gpio_soc_0";
+			reg = <0xf7f07000 0x400>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			porta: gpio-port@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				bank-name = "porta";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <32>;
+				reg = <0>;
+				interrupt-controller;
+				#interrupt-cells = <2>;
+				interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
+
+		gpio1: gpio@f7f0e000 {
+			compatible = "snps,dw-apb-gpio";
+			dev_name = "gpio_soc_1";
+			reg = <0xf7f0e000 0x400>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			portb: gpio-port@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				bank-name = "portb";
+				gpio-controller;
+				#gpio-cells = <2>;
+				snps,nr-gpios = <32>;
+				reg = <0>;
+				interrupt-controller;
+				#interrupt-cells = <2>;
+				interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
+			};
 		};
 	};
 };
