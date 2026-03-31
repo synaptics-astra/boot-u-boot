@@ -363,7 +363,7 @@ static int run_avb_verification(u32 mmcdev, int ab_mode)
 				&out_data);
 
 	/* LOCKED devices with custom root of trust setup is not supported (YELLOW) */
-	if (slot_result == AVB_SLOT_VERIFY_RESULT_OK) {
+	if (slot_result == AVB_SLOT_VERIFY_RESULT_OK || (unlocked && out_data)) {
 		printf("Verification passed successfully\n");
 		if (unlocked)
 			boot_state = AVB_ORANGE;
