@@ -68,6 +68,9 @@ static int berlin_fb_probe(struct udevice *dev)
 {
 	struct berlin_fb_priv *priv = dev_get_priv(dev);
 	int ret;
+	struct video_uc_plat *uc_plat = dev_get_uclass_plat(dev);
+
+	uc_plat->hide_logo = true;    /* Suppress auto-logo */
 
 	gd->flags &= ~GD_FLG_DEVINIT;
 
