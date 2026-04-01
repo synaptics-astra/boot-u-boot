@@ -425,7 +425,7 @@ static int probe_new_regulators(void)
 	struct driver *drv;
 	struct udevice *dev;
 	char regulator_dev_name[100];
-	const char *compat = ofnode_read_string(regulator_node, "compatible");
+	const char *compat;
 
 	ofnode n = ofnode_path("/soc/lcdc-pinmux");
 
@@ -457,8 +457,12 @@ static int probe_new_regulators(void)
 
 		/* Walk through i2c child nodes and attempt to bind any regulator node */
 		ofnode_for_each_subnode(regulator_node, i2c_node) {
+			if (!ofnode_valid(regulator_node))
+				continue;
+
 			/* Found valid node, look for compatible driver to probe */
-			if (!ofnode_valid(regulator_node) || !compat)
+			compat = ofnode_get_property(regulator_node, "compatible", NULL);
+			if (!compat)
 				continue;
 
 			sprintf(regulator_dev_name, "regulator-dev%d", index);
