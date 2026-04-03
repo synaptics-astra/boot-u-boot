@@ -129,6 +129,10 @@ static int syna_load_sm(void)
 	img_read_offset = (img_offset / SDIO_BLK_SIZE) * SDIO_BLK_SIZE;
 	img_read_size = (img_size + 2 * SDIO_BLK_SIZE - 1) / SDIO_BLK_SIZE * SDIO_BLK_SIZE;
 	aligned_offset = img_offset - img_read_offset;
+	if (img_read_size > SYNA_SM_MAX_FW_SIZE) {
+		printf("ERROR: SM firmware image size is too big 0x%x\n", img_size);
+		goto out;
+	}
 
 	/* Read Image to Non-Secure Buffer from flash*/
 	fb_mmc_flash_read_from_offset(pt_name, payload, img_read_size, img_read_offset);
