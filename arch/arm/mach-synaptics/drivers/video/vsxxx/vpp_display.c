@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include "OSAL_api.h"
 #include <linux/types.h>
+#include <limits.h>
 #include "tee_ca_vpp.h"
 #include "soc-syna.h"
 #include "com_type.h"
@@ -281,16 +282,35 @@ int MV_VPP_pushframe(VBUF_INFO *p_vpp_buf, INT plane_id, int width, int height)
 
 int MV_VPP_push_nullframe(int width, int height, int stride, INT plane_id)
 {
-	VBUF_INFO *vbuf;
 	UINT32 size;
 	void *pbuf;
 	INT32 ret;
+	u64 alloc_size;
+	VBUF_INFO *vbuf = NULL;
 
-	pbuf = malloc(width * height * stride);
+	/* Allow height/stride = 0 for null frame */
+	if (width <= 0 || height < 0 || stride < 0) {
+		printf("Invalid nullframe dimensions\n");
+		return -EINVAL;
+	}
+
+	alloc_size = (u64)(unsigned int)width * (u64)(unsigned int)height;
+	if ((unsigned int)stride != 0U &&
+	    alloc_size > (u64)UINT_MAX / (u64)(unsigned int)stride) {
+		printf("Nullframe allocation overflow\n");
+		return -EINVAL;
+	}
+	alloc_size *= (u64)(unsigned int)stride;
+
+	pbuf = malloc((size_t)alloc_size);
 	if (!pbuf)
 		return -ENOMEM;
 
-	get_vbuf_info(&vbuf);
+	ret = get_vbuf_info(&vbuf);
+	if (ret != SUCCESS || !vbuf) {
+		free(pbuf);
+		return -ENOMEM;
+	}
 
 	vbuf->m_pbuf_start   = (ARCH_PTR_TYPE)pbuf;
 	vbuf->m_disp_offset  = 0;

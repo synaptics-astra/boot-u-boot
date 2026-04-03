@@ -79,7 +79,7 @@ static void get_dtbo_path(char *dtbo_path)
 	if (CONFIG_PANEL_DTBO_PATH[0] != '\0')
 		path = CONFIG_PANEL_DTBO_PATH;
 
-	strcpy(dtbo_path, path);
+	snprintf(dtbo_path, MAX_BUF_SIZE, "%s", path);
 }
 
 /* Helper function to get mmc part in the format mmc_dev:part_index */
@@ -109,8 +109,11 @@ static int load_and_apply_dtbo(const char *dtbo_name, char *path,
 		return -EINVAL;
 
 	/* Load DTBO from storage */
-	snprintf(cmd, sizeof(cmd), "ext4load mmc %s %p %s/%s",
-		 mmc_part, fdto_addr, path, dtbo_name);
+	if (snprintf(cmd, sizeof(cmd), "ext4load mmc %s %p %s/%s",
+		     mmc_part, fdto_addr, path, dtbo_name) >= sizeof(cmd)) {
+		printf("DTBO load command too long for %s\n", dtbo_name);
+		return -EINVAL;
+	}
 
 	ret = run_command(cmd, 0);
 	if (ret) {
@@ -266,7 +269,10 @@ static int is_file_exists(const char *dtbo_env, char *path, char *mmc_part)
 		return -ENODEV;
 	}
 
-	snprintf(filename, sizeof(filename), "%s/%s", path, dtbo_env);
+	if (snprintf(filename, sizeof(filename), "%s/%s", path, dtbo_env) >= sizeof(filename)) {
+		printf("DTBO file path too long\n");
+		return -EINVAL;
+	}
 
 	/* Returns 1 if present, 0 if not */
 	return fs_exists(filename) ? 0 : -ENOENT;
@@ -307,7 +313,8 @@ static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 
 		if (ret < 0) {
 			printf("File <%s> doesn't exist at path <%s>: %d\n", tok, path, ret);
-			goto out;
+			free(copy);
+			return ret;
 		}
 
 		tok = strtok(NULL, " ,");

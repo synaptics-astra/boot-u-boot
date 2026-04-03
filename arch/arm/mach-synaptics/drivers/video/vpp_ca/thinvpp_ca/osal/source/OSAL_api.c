@@ -24,49 +24,67 @@
 
 #include "OSAL_api.h"
 #include "compat.h"
-//#include <common.h>
+#include "mem_init.h"
+#include <limits.h>
 #include <linux/types.h>
 
-// VPP reserved memory region name
+/* VPP reserved memory region name */
 #define VPP_RSV_REGION_NAME "vpp"
-
-// External function declaration
-extern int get_mem_region_by_name(u64 *start, u64 *size, char *zone_name);
 
 extern void *malloc_ion_noncacheable(int size);
 extern void *malloc_ion_cacheable(int size);
 
-//malloc- allocate memory from NonSecure,Cache
+/* malloc- allocate memory from NonSecure,Cache */
 void GaloisInit(void)
 {
-    // do nothing
+    /* do nothing */
 }
 
 void *GaloisMalloc(unsigned int size)
 {
 	if (size > 0) {
-		void *ptr = NULL;
+		void *raw_ptr;
+		uintptr_t aligned_ptr;
 
-		ptr = (void *)((((unsigned long)
-			       malloc_ion_noncacheable(size + 32) + 31) >> 5) << 5);
-		return ptr;
+		if (size > (UINT_MAX - 32U))
+			return NULL;
+
+		raw_ptr = malloc_ion_noncacheable((int)(size + 32U));
+		if (!raw_ptr)
+			return NULL;
+
+		aligned_ptr = (((uintptr_t)raw_ptr + 31U) >> 5) << 5;
+
+		return (void *)aligned_ptr;
 	}
-	return(0);
+	return NULL;
 }
 
 void *GMalloc(unsigned int size)
 {
 	if (size > 0) {
-		void *ptr = NULL;
+		void *raw_ptr;
+		uintptr_t aligned_ptr;
 
-		ptr = (void *)((((unsigned long)malloc_ion_noncacheable(size) + 32) >> 5) << 5);
-		return ptr;
+		if (size > (UINT_MAX - 32U))
+			return NULL;
+
+		raw_ptr = malloc_ion_noncacheable((int)(size + 32U));
+		if (!raw_ptr)
+			return NULL;
+
+		aligned_ptr = (((uintptr_t)raw_ptr + 31U) >> 5) << 5;
+
+		return (void *)aligned_ptr;
 	}
-	return(0);
+	return NULL;
 }
 
 void *VPP_ALLOC(unsigned int uiSize)
 {
+	if (uiSize == 0 || uiSize > INT_MAX)
+		return NULL;
+
 	return malloc_ion_cacheable(uiSize);
 }
 
@@ -74,19 +92,25 @@ void *VPP_ALLOC_ALLIGNED(unsigned int size, unsigned int alignment)
 {
 	void *buffer;
 
-	buffer = VPP_ALLOC(size + alignment * 2);
+	if (alignment == 0U || size > (UINT_MAX - alignment * 2U))
+		return NULL;
+
+	buffer = VPP_ALLOC(size + alignment * 2U);
 	if (!buffer)
 		return NULL;
 
-	buffer = (void *)(((uintptr_t)buffer + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1));
+	buffer = (void *)((((uintptr_t)buffer + (alignment - 1U)) / alignment) * alignment);
 
 	return buffer;
 }
 
-//#define VPP_ENABLE_USE_NonCache_For_Cached_Memory
+/* #define VPP_ENABLE_USE_NonCache_For_Cached_Memory */
 void *VPP_TZ_ALLOC(unsigned int  uiSize)
 {
 	void *pPtr = NULL;
+
+	if (uiSize == 0 || uiSize > INT_MAX)
+		return NULL;
 
 #ifdef VPP_ENABLE_TZ_MALLOC_MEM_ALLOCATION
 	pPtr = malloc_ion_cacheable(uiSize);

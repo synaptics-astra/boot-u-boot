@@ -437,7 +437,7 @@ static int syna_lcdc_dev_init(void)
 	syna_lcdc_cfg_wrap_interrupt_enable();
 
 	for (i = 0; i < SYNA_LCDC_MAX; i++) {
-		syna_panel_config = (SYNA_LCDC_PANEL *)malloc(sizeof(struct syna_lcdc_dev));
+		syna_panel_config = (SYNA_LCDC_PANEL *)malloc(sizeof(SYNA_LCDC_PANEL));
 		if (!syna_panel_config) {
 			printf("failed to alloc panel mem lcdc\n");
 			return SYNA_LCDC_EBADPARAM;
@@ -446,6 +446,7 @@ static int syna_lcdc_dev_init(void)
 		syna_lcdc[i] = syna_lcdc_create(i, syna_panel_config);
 		if (!syna_lcdc[i]) {
 			printf("failed to create lcdc\n");
+			free(syna_panel_config);
 			if (i == 1)
 				syna_lcdc_destroy(0);
 

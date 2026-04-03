@@ -23,6 +23,8 @@
  */
 
 #include <linux/types.h>
+#include <limits.h>
+#include <errno.h>
 #include <malloc.h>
 #include "lcdc.h"
 #include "syna_lcdc_dev.h"
@@ -76,6 +78,7 @@ static void syna_lcdc_dlr_start2DDMA(struct syna_lcdc_dev *dev, VBUF_INFO *pinfo
 	unsigned int start_addr;
 	unsigned int stride;
 	unsigned int width_byte;
+	u64 width_bits;
 	HDL_dhub2d *vpp_dhubHandle = SYNA_LCDC_VPP_DHUB_HANDLE;
 
 	if (!vpp_dhubHandle) {
@@ -84,13 +87,28 @@ static void syna_lcdc_dlr_start2DDMA(struct syna_lcdc_dev *dev, VBUF_INFO *pinfo
 	}
 
 	start_addr = (uintptr_t) pinfo->m_pbuf_start;
-	width_byte = (pinfo->m_content_width * pinfo->m_bits_per_pixel)/8;
-	stride = (width_byte * 16 + 15)/16; /*16-byte alignment*/
+	width_bits = (u64)pinfo->m_content_width * (u64)pinfo->m_bits_per_pixel;
+	if (width_bits > ((u64)UINT_MAX * 8ULL)) {
+		printf("invalid DMA width configuration\n");
+		return;
+	}
+
+	width_byte = (unsigned int)(width_bits / 8ULL);
+	if (width_byte > ((UINT_MAX - 15U) / 16U)) {
+		printf("invalid DMA stride configuration\n");
+		return;
+	}
+	stride = (width_byte * 16U + 15U) / 16U; /* 16-byte alignment */
 
 	if (dev->bcm_enable) {
+		if (!CURR_VBI_DMA_CFGQ || !CURR_VBI_DMA_CFGQ->addr) {
+			printf("invalid DMA cfgQ\n");
+			return;
+		}
+
 		cfgQ_shadow = (void *)CURR_VBI_DMA_CFGQ->addr;
 		cfgQ_len = &CURR_VBI_DMA_CFGQ->len;
-		cfgQ = cfgQ_shadow + *cfgQ_len * 2;//cfgQ_shadow + *cfgQ_len;
+		cfgQ = cfgQ_shadow + *cfgQ_len * 2; /* cfgQ_shadow + *cfgQ_len */
 		*cfgQ_len += START_2NDDMA(vpp_dhubHandle, dev->dmaRID,
 					  start_addr, width_byte, width_byte,
 					  1, stride, pinfo->m_content_height,
@@ -111,18 +129,18 @@ static void syna_lcdc_dlr_setdisplay_bpp(struct syna_lcdc_dev *dev,
 	if (m_bits_per_pixel != 16) {
 		bpp = 1;
 		if (m_bits_per_pixel == 24) {
-			//Bit map setting for RGB888
+			/* Bit map setting for RGB888 */
 			bpp |= 1 << 4;
 		} else if (m_bits_per_pixel == 32) {
-			//Bit map setting = A[31:24] B[23:16] G[15:8] R[7:0]
+			/* Bit map setting = A[31:24] B[23:16] G[15:8] R[7:0] */
 			bpp |= 1 << 4;
 
-			//MSB Alpha
+			/* MSB Alpha */
 			if (move_alpha)
 				bpp |= 1 << 3;
 		}
 	}
-	//Input type mode register (IBCR)
+	/* Input type mode register (IBCR) */
 	syna_lcdc_writel(dev, LCDC_REG_INTMR, bpp);
 }
 
@@ -158,12 +176,12 @@ static void syna_lcdc_dlr_start(struct syna_lcdc_dev *dev)
 		ctrl2.uCTRL2_flushCnt_R0 = 0x5;
 		if (pinfo->m_bits_per_pixel == 32 ||
 		    pinfo->m_bits_per_pixel == 16) {
-			ctrl2.uCTRL2_packSel_R0 = 0; //32-bit packing
+			ctrl2.uCTRL2_packSel_R0 = 0; /* 32-bit packing */
 		} else if (pinfo->m_bits_per_pixel == 24) {
-			ctrl2.uCTRL2_packSel_R0 = 1; //24-bit packing
+			ctrl2.uCTRL2_packSel_R0 = 1; /* 24-bit packing */
 		}
 
-		//ceil( ohres*ovres*bpp/128 )
+		/* ceil(ohres * ovres * bpp / 128) */
 		ctrl1.uCTRL1_wordTot_R0 =
 			(pinfo->m_content_width * pinfo->m_bits_per_pixel) / 8;
 
@@ -176,7 +194,7 @@ static void syna_lcdc_dlr_start(struct syna_lcdc_dev *dev)
 		}
 		ctrl1.uCTRL1_wordTot_R0 *= pinfo->m_content_height;
 
-		//width * bpp/32
+		/* width * bpp / 32 */
 		ctrl2.uCTRL2_pixlineTot_R0 =
 			(pinfo->m_content_width * pinfo->m_bits_per_pixel) / 32;
 
@@ -222,6 +240,9 @@ void syna_lcdc_dlr_resetbuf(struct syna_lcdc_dev *dev)
 
 static void syna_lcdc_dlr_mergebuf(struct syna_lcdc_dev *dev)
 {
+	unsigned long start_addr;
+	unsigned long end_addr;
+
 	HDL_dhub2d *bcm_dhubHandle = SYNA_LCDC_BCM_DHUB_HANDLE;
 
 	if (!bcm_dhubHandle) {
@@ -230,12 +251,23 @@ static void syna_lcdc_dlr_mergebuf(struct syna_lcdc_dev *dev)
 	}
 
 	if (dev->bcm_enable) {
+		if (!CURR_VBI_DMA_CFGQ || !CURR_VBI_DMA_CFGQ->addr) {
+			printf("invalid DMA cfgQ\n");
+			return;
+		}
+
 		bcmbuf_to_CFGQ(bcm_dhubHandle, avioDhubChMap_vpp_BCM_R,
 			       BCM_SCHED_Q13, CURR_VBI_BCM_BUF,
 			       CURR_VBI_BCM_CFGQ);
 
-		flush_dcache_range((unsigned long)CURR_VBI_DMA_CFGQ->addr,
-				   ((int)(long long)CURR_VBI_DMA_CFGQ->addr) + DMA_CMD_BUFFER_SIZE);
+		start_addr = (unsigned long)CURR_VBI_DMA_CFGQ->addr;
+		end_addr = start_addr + (unsigned long)DMA_CMD_BUFFER_SIZE;
+		if (end_addr < start_addr) {
+			printf("DMA cfgQ range overflow\n");
+			return;
+		}
+
+		flush_dcache_range(start_addr, end_addr);
 
 		bcmbuf_CFGQ_To_CFGQ(bcm_dhubHandle, avioDhubChMap_vpp_BCM_R,
 				    BCM_SCHED_Q13, CURR_VBI_DMA_CFGQ,
@@ -246,6 +278,8 @@ static void syna_lcdc_dlr_mergebuf(struct syna_lcdc_dev *dev)
 static void syna_lcdc_dlr_commitbuf(struct syna_lcdc_dev *dev, int use_vbi)
 {
 	int schedQ;
+	unsigned long start_addr;
+	unsigned long end_addr;
 	HDL_dhub2d *bcm_dhubHandle = SYNA_LCDC_BCM_DHUB_HANDLE;
 
 	if (!bcm_dhubHandle) {
@@ -255,9 +289,19 @@ static void syna_lcdc_dlr_commitbuf(struct syna_lcdc_dev *dev, int use_vbi)
 
 	if (!dev->bcm_enable)
 		return;
+	if (!CURR_VBI_BCM_CFGQ || !CURR_VBI_BCM_CFGQ->addr) {
+		printf("invalid BCM cfgQ\n");
+		return;
+	}
 
-	flush_dcache_range((unsigned long)CURR_VBI_BCM_CFGQ->addr,
-			   ((int)(long long)CURR_VBI_BCM_CFGQ->addr) + DMA_CMD_BUFFER_SIZE);
+	start_addr = (unsigned long)CURR_VBI_BCM_CFGQ->addr;
+	end_addr = start_addr + (unsigned long)DMA_CMD_BUFFER_SIZE;
+	if (end_addr < start_addr) {
+		printf("BCM cfgQ range overflow\n");
+		return;
+	}
+
+	flush_dcache_range(start_addr, end_addr);
 
 	schedQ = (dev->lcdcID == 0) ? BCM_SCHED_Q0 : BCM_SCHED_Q1;
 	if (use_vbi) {
@@ -280,7 +324,7 @@ static void syna_lcdc_dlr_commitbuf(struct syna_lcdc_dev *dev, int use_vbi)
 					  BCM_SCHED_Q12,
 					  CURR_VBI_BCM_CFGQ, 1);
 		if (dev->bcm_enable) {
-			//To avoid issue for 2nd Frame
+			/* To avoid issue for 2nd frame */
 			bcmbuf_DHUB_CFGQ_Commit(bcm_dhubHandle,
 						avioDhubChMap_vpp_BCM_R,
 						schedQ,
@@ -304,33 +348,47 @@ void syna_bcmbuf_submit(struct syna_lcdc_dev *dev, int use_vbi)
 
 void syna_lcdc_dlr_handler(struct syna_lcdc_dev *dev)
 {
-	//update current frame
+	/* Update current frame */
 	syna_lcdc_dlr_frameupdate(dev);
 
 	if (dev->curr_frame) {
-		//client clear
+		/* Client clear */
 		syna_lcdc_dlr_clearClient(dev);
 
-		//start channel data loader
+		/* Start channel data loader */
 		syna_lcdc_dlr_start(dev);
 
-		//client start
+		/* Client start */
 		syna_lcdc_dlr_startClient(dev);
 	}
 }
 
-static void syna_lcdc_create_BcmCfgQ(struct syna_lcdc_dev *dev,
-				     DHUB_CFGQ *cfgQ,
-				     void *pvpp_mem)
+static int syna_lcdc_create_BcmCfgQ(struct syna_lcdc_dev *dev,
+				    DHUB_CFGQ *cfgQ,
+				    void *pvpp_mem)
 {
 	cfgQ->handle = malloc(DMA_CMD_BUFFER_SIZE);
+	if (!cfgQ->handle) {
+		cfgQ->addr = NULL;
+		cfgQ->phy_addr = NULL;
+		cfgQ->len = 0;
+		return -ENOMEM;
+	}
+
 	cfgQ->addr = cfgQ->handle;
 	cfgQ->phy_addr = cfgQ->handle;
+	cfgQ->len = 0;
+
+	return 0;
 }
 
 int syna_lcdc_dlr_create(struct syna_lcdc_dev *dev, int num)
 {
 	int i;
+	DHUB_CFGQ *cfgq_dma;
+	DHUB_CFGQ *cfgq_bcm;
+	void *mem_dma;
+	void *mem_bcm;
 
 	for (i = 0; i < BCM_BUF_COUNT; i++) {
 		/* create VBI BCM buffer */
@@ -341,18 +399,32 @@ int syna_lcdc_dlr_create(struct syna_lcdc_dev *dev, int num)
 			return SYNA_LCDC_ENOMEM;
 		}
 
-		syna_lcdc_create_BcmCfgQ(dev,
-					 &dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_DMA],
-					 &dev->bcmbuf[i].vpp_mem_handle[SYNA_DHUB_CFGQ_TYPE_DMA]);
+		cfgq_dma = &dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_DMA];
+		mem_dma = &dev->bcmbuf[i].vpp_mem_handle[SYNA_DHUB_CFGQ_TYPE_DMA];
 
-		syna_lcdc_create_BcmCfgQ(dev,
-					 &dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_BCM],
-					 &dev->bcmbuf[i].vpp_mem_handle[SYNA_DHUB_CFGQ_TYPE_BCM]);
+		if (syna_lcdc_create_BcmCfgQ(dev, cfgq_dma, mem_dma)) {
+			printf("failed to create DMA cfgQ\n");
+			bcmbuf_destroy(&dev->bcmbuf[i].vbi_bcm_buf);
+			return SYNA_LCDC_ENOMEM;
+		}
+
+		cfgq_bcm = &dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_BCM];
+		mem_bcm = &dev->bcmbuf[i].vpp_mem_handle[SYNA_DHUB_CFGQ_TYPE_BCM];
+
+		if (syna_lcdc_create_BcmCfgQ(dev, cfgq_bcm, mem_bcm)) {
+			printf("failed to create BCM cfgQ\n");
+			free(cfgq_dma->addr);
+			cfgq_dma->addr = NULL;
+			cfgq_dma->handle = NULL;
+			cfgq_dma->phy_addr = NULL;
+			bcmbuf_destroy(&dev->bcmbuf[i].vbi_bcm_buf);
+			return SYNA_LCDC_ENOMEM;
+		}
 
 		dev->bufferCurSet = 0;
 	}
 
-	/*For first frame, Direct write method used for Register & DHUB Write*/
+	/* For first frame, direct write method is used for register and DHUB write */
 	dev->prev_frame = NULL;
 	dev->curr_frame = NULL;
 
@@ -379,8 +451,10 @@ void syna_lcdc_dlr_destroy(struct syna_lcdc_dev *dev)
 	int i;
 
 	for (i = 0; i < BCM_BUF_COUNT; i++) {
-		free(dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_DMA].addr);
-		free(dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_BCM].addr);
+		if (dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_DMA].addr)
+			free(dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_DMA].addr);
+		if (dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_BCM].addr)
+			free(dev->bcmbuf[i].vbi_cfgQ[SYNA_DHUB_CFGQ_TYPE_BCM].addr);
 
 		bcmbuf_destroy(&dev->bcmbuf[i].vbi_bcm_buf);
 	}

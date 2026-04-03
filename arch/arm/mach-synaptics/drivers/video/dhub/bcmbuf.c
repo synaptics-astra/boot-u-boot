@@ -25,6 +25,7 @@
 #include <linux/types.h>
 #include "bcmbuf.h"
 #include "OSAL_api.h"
+#include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <cpu_func.h>
@@ -39,12 +40,17 @@
  ****************************************************************/
 int bcmbuf_create(BCMBUF *pbcmbuf, int size, void *memlist)
 {
-	if (size <= 0)
+	if (!pbcmbuf || size <= 0)
 		return (BCMBUF_EBADPARAM);
 
 	pbcmbuf->head = GaloisMalloc(size);
+	if (!pbcmbuf->head)
+		return BCMBUF_ENOMEM;
+
 	pbcmbuf->phy_addr = pbcmbuf->head;
 	pbcmbuf->size = size;
+	pbcmbuf->writer = pbcmbuf->head;
+	pbcmbuf->tail = pbcmbuf->head + pbcmbuf->size;
 
 	return 0;
 }
@@ -57,11 +63,19 @@ int bcmbuf_create(BCMBUF *pbcmbuf, int size, void *memlist)
  ****************************************************************/
 int bcmbuf_destroy(BCMBUF *pbcmbuf)
 {
+	if (!pbcmbuf)
+		return (BCMBUF_EBADPARAM);
+
 	/* de-allocate memory for the buffer */
 	if (!pbcmbuf->head)
 		return (BCMBUF_EBADCALL);
 
 	free(pbcmbuf->head);
+	pbcmbuf->head = NULL;
+	pbcmbuf->tail = NULL;
+	pbcmbuf->writer = NULL;
+	pbcmbuf->phy_addr = NULL;
+	pbcmbuf->size = 0;
 
 	return BCMBUF_OK;
 }
@@ -74,9 +88,12 @@ int bcmbuf_destroy(BCMBUF *pbcmbuf)
  ****************************************************************/
 int bcmbuf_reset(BCMBUF *pbcmbuf)
 {
+	if (!pbcmbuf || !pbcmbuf->head || pbcmbuf->size <= 0)
+		return BCMBUF_EBADPARAM;
+
 	pbcmbuf->tail = pbcmbuf->head + pbcmbuf->size;
 
-	/*set pointers to the head*/
+	/* Set pointers to the head */
 	pbcmbuf->writer = pbcmbuf->head;
 	pbcmbuf->subID = -1; /* total */
 
@@ -90,6 +107,9 @@ int bcmbuf_reset(BCMBUF *pbcmbuf)
  ********************************************************/
 void bcmbuf_select(BCMBUF *pbcmbuf, int subID)
 {
+	if (!pbcmbuf || !pbcmbuf->head)
+		return;
+
 	/* reset read/write pointer of the buffer */
 	pbcmbuf->writer = pbcmbuf->head;
 	pbcmbuf->subID = subID;
@@ -107,16 +127,19 @@ int bcmbuf_write(BCMBUF *pbcmbuf, unsigned int address, unsigned int value)
 {
 	unsigned int *end;
 
-	/*if not enough space for storing another 8 bytes, wrap around happens*/
+	if (!pbcmbuf || !pbcmbuf->writer || !pbcmbuf->tail)
+		return BCMBUF_EBADPARAM;
+
+	/* If there is not enough space for another 8 bytes, wrap-around happens */
 	end = pbcmbuf->tail;
 
 	if (pbcmbuf->writer == end) {
-		/*the buffer is full, no space for wrap around*/
+		/* The buffer is full, no space for wrap-around */
 		printf("LCDC_BCMBUF_Write failed (0x%x 0x%x)\r\n", address, value);
 		return BCMBUF_EBCMBUFFULL;
 	}
 
-	/*save the data to the buffer*/
+	/* Save the data to the buffer */
 	*pbcmbuf->writer = value;
 	pbcmbuf->writer++;
 	*pbcmbuf->writer = address;
@@ -172,15 +195,22 @@ int bcmbuf_to_CFGQ(HDL_dhub2d *pDhubHandle,
 		   DHUB_CFGQ *cfgQ)
 {
 	unsigned int *start, *phy_start;
-	int size;
+	unsigned int size;
+	long long size_ll;
 	unsigned int bcm_sched_cmd[2];
+
+	if (!pDhubHandle || !pbcmbuf || !cfgQ || !cfgQ->addr ||
+	    !pbcmbuf->head || !pbcmbuf->writer || !pbcmbuf->phy_addr)
+		return BCMBUF_EBADPARAM;
 
 	start = pbcmbuf->head;
 	phy_start = pbcmbuf->phy_addr;
 
-	size = (int)(long long)pbcmbuf->writer - (int)(long long)start;
-	if (size <= 0)
+	size_ll = (long long)pbcmbuf->writer - (long long)start;
+	if (size_ll <= 0 || size_ll > UINT_MAX)
 		return BCMBUF_EBADPARAM;
+
+	size = (unsigned int)size_ll;
 
 	flush_cache((unsigned long)phy_start, size);
 
@@ -209,6 +239,9 @@ void bcmbuf_CFGQ_To_CFGQ(HDL_dhub2d *pDhubHandle,
 			 DHUB_CFGQ *cfgQ)
 {
 	unsigned int bcm_sched_cmd[2];
+
+	if (!pDhubHandle || !src_cfgQ || !cfgQ || !cfgQ->addr)
+		return;
 
 	if (src_cfgQ->len <= 0)
 		return;
@@ -239,6 +272,9 @@ int bcmbuf_DHUB_CFGQ_Commit(HDL_dhub2d *pDhubHandle,
 {
 	unsigned int bcm_sched_cmd[2];
 
+	if (!pDhubHandle || !cfgQ)
+		return BCMBUF_EBADPARAM;
+
 	if (cfgQ->len <= 0)
 		return BCMBUF_EBADPARAM;
 
@@ -259,6 +295,9 @@ void bcmbuf_cfgq_hardwaretrans(HDL_dhub2d *pDhubHandle,
 			       DHUB_CFGQ *cfgQ,
 			       int block)
 {
+	if (!pDhubHandle || !cfgQ)
+		return;
+
 	if (cfgQ->len <= 0)
 		return;
 
@@ -285,6 +324,9 @@ void bcmbuf_raw_hardwaretrans(HDL_dhub2d *pDhubHandle,
 	HDL_semaphore *pSemHandle;
 	int status;
 	unsigned int bcm_sched_cmd[2];
+
+	if (!pDhubHandle || !start)
+		return;
 
 	if (size <= 0)
 		return;

@@ -36,11 +36,17 @@ static UINT32 gDescIndex;
 
 HRESULT get_vbuf_info(VBUF_INFO **pVBInfo)
 {
+	if (!pVBInfo)
+		return MV_VPP_ENOMEM;
+
 	gDescIndex++;
 	if (gDescIndex == MAX_NUM_GLOBAL_VBUF_DESC)
 		gDescIndex = 0;
+	if (!gDescArray[gDescIndex])
+		return MV_VPP_ENOMEM;
+
 	*pVBInfo = gDescArray[gDescIndex];
-		return SUCCESS;
+	return SUCCESS;
 }
 
 void build_frames(VBUF_INFO *vbufinfo, INT32 srcfmt, INT32 bit_depth, INT32 x,

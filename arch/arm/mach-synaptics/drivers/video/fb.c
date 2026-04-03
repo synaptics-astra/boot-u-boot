@@ -22,6 +22,7 @@
  * TO ANY PARTY SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
  */
 #include <linux/types.h>
+#include <limits.h>
 #include <linux/compat.h>
 #include <linux/delay.h>
 #include <dm.h>

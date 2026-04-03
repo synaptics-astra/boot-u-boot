@@ -236,10 +236,13 @@ int syna_lcdc_init(struct berlin_fb_priv *priv)
 		printf("Error in allocating memory for dsi_dev");
 		return -ENOMEM;
 	}
+	memset(lcdc_config_data->dsi_dev, 0, sizeof(struct mipi_dsi_dev));
 
 	ret = mipi_dsi_init(lcdc_config_data->dsi_dev);
 	if (ret) {
 		printf("MIPI-DSI init fail\n");
+		free(lcdc_config_data->dsi_dev);
+		lcdc_config_data->dsi_dev = NULL;
 		return ret;
 	}
 
