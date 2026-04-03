@@ -311,6 +311,9 @@ static int get_bootctrl_metadata(void *p_bootctrl)
 		}
 
 		misc_bootctrl = (void *)malloc(dev_desc->blksz);
+		if (!misc_bootctrl)
+			return -ENOMEM;
+
 		strat_blk = info.start + 4096 / dev_desc->blksz;
 		blk_dread(dev_desc, strat_blk, 1, misc_bootctrl);
 		memcpy(p_bootctrl, (void *)misc_bootctrl, sizeof(misc_boot_ctrl_t));
