@@ -14,6 +14,29 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright (C) 2026 Synaptics Incorporated. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * INFORMATION CONTAINED IN THIS DOCUMENT IS PROVIDED "AS-IS,” AND
+ * SYNAPTICS EXPRESSLY DISCLAIMS ALL EXPRESS AND IMPLIED WARRANTIES,
+ * INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE, AND ANY WARRANTIES OF NON-INFRINGEMENT OF ANY
+ * INTELLECTUAL PROPERTY RIGHTS. IN NO EVENT SHALL SYNAPTICS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
+ * CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH THE USE OF
+ * THE INFORMATION CONTAINED IN THIS DOCUMENT, HOWEVER CAUSED AND BASED
+ * ON ANY THEORY OF LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, AND EVEN IF SYNAPTICS WAS ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE. IF A TRIBUNAL OF COMPETENT
+ * JURISDICTION DOES NOT PERMIT THE DISCLAIMER OF DIRECT DAMAGES OR ANY
+ * OTHER DAMAGES, SYNAPTICS’ TOTAL CUMULATIVE LIABILITY TO ANY PARTY
+ * SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
+ */
+
 #include "ext4_utils.h"
 #include "allocate.h"
 #include "indirect.h"
@@ -195,8 +218,7 @@ void ext4_create_fs_aux_info()
 
 	/* Alloc an array to hold the pointers to the backup superblocks */
 	aux_info.backup_sb = calloc(aux_info.groups, sizeof(char *));
-
-	if (!aux_info.sb)
+	if (!aux_info.backup_sb)
 		critical_error_errno("calloc");
 
 	aux_info.bg_desc = calloc(info.block_size, aux_info.bg_desc_blocks);
@@ -304,6 +326,9 @@ void ext4_fill_in_sb(void)
 		if (ext4_bg_has_super_block(i)) {
 			if (i != 0) {
 				aux_info.backup_sb[i] = calloc(info.block_size, 1);
+				if (!aux_info.backup_sb[i])
+					critical_error_errno("calloc");
+
 				memcpy(aux_info.backup_sb[i], sb, sizeof(struct ext4_super_block));
 				/* Update the block group nr of this backup superblock */
 				aux_info.backup_sb[i]->s_block_group_nr = i;

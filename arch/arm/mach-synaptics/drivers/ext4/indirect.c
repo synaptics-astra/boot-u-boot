@@ -14,6 +14,29 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright (C) 2026 Synaptics Incorporated. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * INFORMATION CONTAINED IN THIS DOCUMENT IS PROVIDED "AS-IS,” AND
+ * SYNAPTICS EXPRESSLY DISCLAIMS ALL EXPRESS AND IMPLIED WARRANTIES,
+ * INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE, AND ANY WARRANTIES OF NON-INFRINGEMENT OF ANY
+ * INTELLECTUAL PROPERTY RIGHTS. IN NO EVENT SHALL SYNAPTICS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
+ * CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH THE USE OF
+ * THE INFORMATION CONTAINED IN THIS DOCUMENT, HOWEVER CAUSED AND BASED
+ * ON ANY THEORY OF LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, AND EVEN IF SYNAPTICS WAS ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE. IF A TRIBUNAL OF COMPETENT
+ * JURISDICTION DOES NOT PERMIT THE DISCLAIMER OF DIRECT DAMAGES OR ANY
+ * OTHER DAMAGES, SYNAPTICS’ TOTAL CUMULATIVE LIABILITY TO ANY PARTY
+ * SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
+ */
+
 #include "ext4_utils.h"
 #include "indirect.h"
 #include "allocate.h"
@@ -90,6 +113,8 @@ static void fill_dindirect_block(u32 *dind_block, int len, struct block_allocati
 		dind_block[i] = ind_block;
 
 		u32 *ind_block_data = calloc(info.block_size, 1);
+		if (!ind_block_data)
+			critical_error_errno("calloc");
 		sparse_file_add_data(ext4_sparse_file, ind_block_data, BB_DATA_MALLOC, info.block_size,
 				ind_block);
 		int ind_block_len = min((int)aux_info.blocks_per_ind, len);
@@ -120,6 +145,8 @@ static void fill_tindirect_block(u32 *tind_block, int len, struct block_allocati
 		tind_block[i] = dind_block;
 
 		u32 *dind_block_data = calloc(info.block_size, 1);
+		if (!dind_block_data)
+			critical_error_errno("calloc");
 		sparse_file_add_data(ext4_sparse_file, dind_block_data, BB_DATA_MALLOC, info.block_size,
 				dind_block);
 		int dind_block_len = min((int)aux_info.blocks_per_dind, len);
@@ -169,6 +196,8 @@ static int inode_attach_indirect_blocks(struct ext4_inode *inode,
 	}
 
 	u32 *ind_block_data = calloc(info.block_size, 1);
+	if (!ind_block_data)
+		critical_error_errno("calloc");
 	sparse_file_add_data(ext4_sparse_file, ind_block_data, BB_DATA_MALLOC, info.block_size,
 			ind_block);
 
@@ -201,6 +230,8 @@ static int inode_attach_dindirect_blocks(struct ext4_inode *inode,
 	}
 
 	u32 *dind_block_data = calloc(info.block_size, 1);
+	if (!dind_block_data)
+		critical_error_errno("calloc");
 	sparse_file_add_data(ext4_sparse_file, dind_block_data, BB_DATA_MALLOC, info.block_size,
 			dind_block);
 
@@ -233,6 +264,8 @@ static int inode_attach_tindirect_blocks(struct ext4_inode *inode,
 	}
 
 	u32 *tind_block_data = calloc(info.block_size, 1);
+	if (!tind_block_data)
+		critical_error_errno("calloc");
 	sparse_file_add_data(ext4_sparse_file, tind_block_data, BB_DATA_MALLOC, info.block_size,
 			tind_block);
 

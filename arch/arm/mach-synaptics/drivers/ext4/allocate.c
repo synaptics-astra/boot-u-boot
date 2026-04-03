@@ -14,6 +14,29 @@
  * limitations under the License.
  */
 
+/*
+ * Copyright (C) 2026 Synaptics Incorporated. All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * INFORMATION CONTAINED IN THIS DOCUMENT IS PROVIDED "AS-IS,” AND
+ * SYNAPTICS EXPRESSLY DISCLAIMS ALL EXPRESS AND IMPLIED WARRANTIES,
+ * INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE, AND ANY WARRANTIES OF NON-INFRINGEMENT OF ANY
+ * INTELLECTUAL PROPERTY RIGHTS. IN NO EVENT SHALL SYNAPTICS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, PUNITIVE, OR
+ * CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH THE USE OF
+ * THE INFORMATION CONTAINED IN THIS DOCUMENT, HOWEVER CAUSED AND BASED
+ * ON ANY THEORY OF LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, AND EVEN IF SYNAPTICS WAS ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE. IF A TRIBUNAL OF COMPETENT
+ * JURISDICTION DOES NOT PERMIT THE DISCLAIMER OF DIRECT DAMAGES OR ANY
+ * OTHER DAMAGES, SYNAPTICS’ TOTAL CUMULATIVE LIABILITY TO ANY PARTY
+ * SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
+ */
+
 #include "ext4_utils.h"
 #include "allocate.h"
 
@@ -31,6 +54,9 @@ struct xattr_list_element {
 struct block_allocation *create_allocation(void)
 {
 	struct block_allocation *alloc = malloc(sizeof(struct block_allocation));
+	if (!alloc)
+		critical_error_errno("malloc");
+
 	alloc->list.first = NULL;
 	alloc->list.last = NULL;
 	alloc->oob_list.first = NULL;
@@ -98,6 +124,9 @@ void append_region(struct block_allocation *alloc,
 {
 	struct region *reg;
 	reg = malloc(sizeof(struct region));
+	if (!reg)
+		critical_error_errno("malloc");
+
 	reg->block = block;
 	reg->len = len;
 	reg->bg = bg_num;
@@ -223,6 +252,9 @@ static void init_bg(struct block_group_info *bg, unsigned int i)
 		header_blocks += 1 + aux_info.bg_desc_blocks + info.bg_desc_reserve_blocks;
 
 	bg->bitmaps = calloc(info.block_size, 2);
+	if (!bg->bitmaps)
+		critical_error_errno("calloc");
+
 	bg->block_bitmap = bg->bitmaps;
 	bg->inode_bitmap = bg->bitmaps + info.block_size;
 
@@ -244,6 +276,8 @@ static void init_bg(struct block_group_info *bg, unsigned int i)
 	bg->chunk_count = 0;
 	bg->max_chunk_count = 1;
 	bg->chunks = (struct region*) calloc(bg->max_chunk_count, sizeof(struct region));
+	if (!bg->chunks)
+		critical_error_errno("calloc");
 
 	if (reserve_blocks(bg, i, 0, bg->header_blocks) < 0)
 		printf("Error: failed to reserve %u blocks in block group %u\n", bg->header_blocks, i);
@@ -352,6 +386,9 @@ done:
 	}
 	bgs[found_bg].data_blocks_used += found_allocate_len;
 	reg = malloc(sizeof(struct region));
+	if (!reg)
+		critical_error_errno("malloc");
+
 	reg->block = found_block + bgs[found_bg].first_block;
 	reg->len = found_allocate_len;
 	reg->next = NULL;
@@ -508,6 +545,8 @@ static struct region *do_split_allocation(struct block_allocation *alloc, u32 le
 
 	if (len > 0) {
 		new = malloc(sizeof(struct region));
+		if (!new)
+			critical_error_errno("malloc");
 
 		new->bg = reg->bg;
 		new->block = reg->block + len;

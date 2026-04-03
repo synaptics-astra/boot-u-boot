@@ -1,0 +1,9 @@
+“ext4_utils” module
+This product incorporates code from the
+The Android Open Source Project,
+licensed under the Apache License 2.0.
+
+Significant modifications were made by Synaptics Corporation in 2026:
+  - add memory checking for malloc and calloc
+
+A complete copy of the Apache License 2.0 is provided in the NOTICE file
