@@ -1,0 +1,4 @@
+config SYNA_KLAMATH_OTP
+	bool "Support Synaptics OTP in U-BOOT"
+	depends on SYNA_SUBOOT && TARGET_KLAMATH
+	default y

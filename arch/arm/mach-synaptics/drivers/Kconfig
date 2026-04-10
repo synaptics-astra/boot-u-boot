@@ -15,4 +15,5 @@ source "arch/arm/mach-synaptics/drivers/pwm/Kconfig"
 source "arch/arm/mach-synaptics/drivers/regulator/Kconfig"
 source "arch/arm/mach-synaptics/drivers/usbconsole/Kconfig"
 source "arch/arm/mach-synaptics/drivers/nand/Kconfig"
+source "arch/arm/mach-synaptics/drivers/otp/Kconfig"
 endmenu
