@@ -37,6 +37,30 @@ enum {
 	EMMC_GPP_PARTITION,
 };
 
+#ifdef CONFIG_TARGET_KLAMATH
+struct KLAMATH_OTP_ITEMS {
+	u32 resv_0x0_0x324[202];	/* 0x000 ~ 0x324 */
+
+	u32 DRO_SVT              : 16;
+	u32 DRO_LVT              : 16;
+	u32 DRO_ULVT             : 16;
+	u32 RFU                  : 16;
+
+	u32 VDD_CORE_25C_SIDD    : 16;
+	u32 SM_VDD_CORE_25C_SIDD : 16;
+	u32 VDD_CORE_105C_SIDD   : 16;
+	u32 SM_VDD_CORE_105C_SIDD: 16;
+	u32 VDD_CORE_125C_SIDD   : 16;
+	u32 SM_VDD_CORE_125C_SIDD: 16;
+	u32 TSEN_25C             : 8;
+	u32 TSEN_105C            : 8;
+	u32 TSEN_125C            : 8;
+	u32 PVT_REV              : 8;
+
+	u32 resv_0x340_0x3FC[48];	/* 0x340 ~ 0x3FC */
+};
+#endif
+
 int get_leakage(void);
 int get_fe_bgs(void);
 int get_boot_slot(void);
@@ -54,5 +78,15 @@ int get_kernel_logo_param(char *fl_args);
 int get_fastlogo_addr(char *fl_args);
 void set_force_persistent_res_status(bool mode);
 bool get_force_persistent_res_status(void);
+
+#ifdef CONFIG_TARGET_KLAMATH
+int get_Klamath_leakage(void);
+int klamath_read_public_otp(struct KLAMATH_OTP_ITEMS *otp);
+#else
+static inline int get_Klamath_leakage(void)
+{
+	return -1;
+}
+#endif
 
 #endif

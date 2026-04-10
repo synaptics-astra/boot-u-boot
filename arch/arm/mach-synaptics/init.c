@@ -61,6 +61,9 @@ void save_boot_params(unsigned long param1, unsigned long param2, unsigned long 
 
 int get_leakage(void)
 {
+	if (IS_ENABLED(CONFIG_TARGET_KLAMATH))
+		return get_Klamath_leakage();
+
 	if (param2_save != 0xFFFFFFFF)
 		return ((struct bl_boot_arg *)param2_save)->leakage;
 
