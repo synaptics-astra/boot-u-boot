@@ -111,6 +111,29 @@ config SYNA_SPI_BOOT_PART_SIZE
 	  Boot partition size used when loading partition information
 	  from SPI NOR flash.
 
+choice
+	depends on SYNA_SUBOOT
+	prompt "Select misc storage"
+	default SYNA_MISC_IN_MMC
+
+config SYNA_MISC_IN_MMC
+	bool "MMC"
+	help
+	  Select this option to place the misc partition on an MMC device.
+	  The misc partition is used to store boot control or other persistent
+	  metadata that must survive across reboots on platforms using MMC
+	  for non-volatile storage.
+
+config SYNA_MISC_IN_MTD
+	bool "MTD"
+	help
+	  Select this option to place the misc partition on an MTD device.
+	  The misc partition is used to store boot control or other persistent
+	  metadata that must survive across reboots on platforms using MTD
+	  for non-volatile storage.
+
+endchoice
+
 config SYNA_GENX_V3
 	bool "synaptics GenX V3 image"
 	default n

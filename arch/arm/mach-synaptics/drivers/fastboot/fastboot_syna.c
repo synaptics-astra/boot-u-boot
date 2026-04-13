@@ -202,7 +202,7 @@ static int write_bootctrl_metadata(void *p_bootctrl)
 		return -1;
 	}
 
-	if (IS_ENABLED(CONFIG_MMC)) {
+	if (IS_ENABLED(CONFIG_SYNA_MISC_IN_MMC)) {
 		struct blk_desc *dev_desc;
 		struct disk_partition info;
 		lbaint_t strat_blk, size_blk;
@@ -232,7 +232,7 @@ static int write_bootctrl_metadata(void *p_bootctrl)
 		blk_dwrite(dev_desc, strat_blk, size_blk, p_bootctrl);
 
 		return 0;
-	} else if (IS_ENABLED(CONFIG_MTD)) {
+	} else if (IS_ENABLED(CONFIG_SYNA_MISC_IN_MTD)) {
 		loff_t start;
 		size_t write_len;
 		size_t write;
@@ -288,7 +288,7 @@ static int get_bootctrl_metadata(void *p_bootctrl)
 		return -1;
 	}
 
-	if (IS_ENABLED(CONFIG_MMC)) {
+	if (IS_ENABLED(CONFIG_SYNA_MISC_IN_MMC)) {
 		struct blk_desc *dev_desc;
 		struct disk_partition info;
 		lbaint_t strat_blk;
@@ -326,7 +326,7 @@ static int get_bootctrl_metadata(void *p_bootctrl)
 		free(misc_bootctrl);
 
 		return 0;
-	} else if (IS_ENABLED(CONFIG_MTD)) {
+	} else if (IS_ENABLED(CONFIG_SYNA_MISC_IN_MTD)) {
 		loff_t start;
 		int ret = -1;
 		struct mtd_info *mtd = get_mtd_device(NULL, 0);
