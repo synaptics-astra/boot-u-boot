@@ -54,6 +54,13 @@
 
 #define FDTO_SIZE 0x2000
 
+#define DEV_EMMC_LK_IDX 0
+#ifdef CONFIG_TARGET_KLAMATH
+#define DEV_SD_LK_IDX 2
+#else
+#define DEV_SD_LK_IDX 1
+#endif
+
 enum {
 	FDT_UPDATE_TZ = BIT(0),
 	FDT_UPDATE_BOOTARGS = BIT(1),
@@ -297,7 +304,7 @@ int setup_tz_mem(void *fdt)
 #ifdef CONFIG_SYNA_MMC_SUBOOT
 static void setup_rootfs(char *bootargs)
 {
-	int index = -1, mmc_dev = -1;
+	int index = -1, mmc_dev = -1, mmc_dev_lk = -1;
 	char index_str[12];
 	int slot = get_current_slot();
 	int hwpart = 0;
@@ -316,11 +323,13 @@ static void setup_rootfs(char *bootargs)
 		index = f_mmc_get_part_index(mmc_dev, slot == BOOTSEL_A ? ROOTFS_A : ROOTFS_B);
 	}
 
+	mmc_dev_lk = mmc_dev == DEV_SD ? DEV_SD_LK_IDX : DEV_EMMC_LK_IDX;
+
 	if (hwpart >= 0  && index >= 0) {
 		if (hwpart >= 4)
-			sprintf(index_str, "%dgp%dp%d", mmc_dev, hwpart - 4, index);
+			sprintf(index_str, "%dgp%dp%d", mmc_dev_lk, hwpart - 4, index);
 		else
-			sprintf(index_str, "%dp%d", mmc_dev, index);
+			sprintf(index_str, "%dp%d", mmc_dev_lk, index);
 
 		strcat(bootargs, index_str);
 		strcat(bootargs, " ro");
