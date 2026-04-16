@@ -40,9 +40,7 @@
 #define MAGIC_NUMBER           (0xD2ADA3F1)
 #define CRC32_SIZE      (4)
 
-#define SPI_VT_OFFSET 0x7F800
 #define SPI_BOOT_PART_NUM 2
-#define SPI_BOOT_PART_SIZE 0x200000
 
 #define NAND_PREBOOT_COPIES 8
 
@@ -141,8 +139,8 @@ static int get_partition_info(struct mtd_info *mtd)
 		boot_part_size = NAND_BOOT_PARTITION_SIZE;
 		boot_part = NAND_PREBOOT_COPIES;
 	} else if (IS_ENABLED(CONFIG_SPI_FLASH_MTD)) {
-		start = SPI_VT_OFFSET;
-		boot_part_size = SPI_BOOT_PART_SIZE;
+		start = CONFIG_SYNA_SPI_VT_OFFSET;
+		boot_part_size = CONFIG_SYNA_SPI_BOOT_PART_SIZE;
 		boot_part = SPI_BOOT_PART_NUM;
 	} else {
 		ret = -1;
