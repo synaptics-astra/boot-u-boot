@@ -238,7 +238,8 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 
 	if (!pResCfg->vppMipiCmd.bufsize) {
 		printf("Invalid MIPI commands\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	pResCfg->vppMipiCmd.pcmd = (ARCH_PTR_TYPE *)
@@ -246,7 +247,8 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 						      PAGE_SIZE);
 	if (!pResCfg->vppMipiCmd.pcmd) {
 		printf("vppMipiCmd memory failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	memset(pResCfg->vppMipiCmd.pcmd, 0,
@@ -284,7 +286,13 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 	/* length of vertical sync */
 	video_mode->vsync_len = pResCfg->infoparams.resInfo.vsyncwidth;
 
-	return 0;
+	ret = 0;
+
+out:
+	if (dts_panel_commands)
+		free(dts_panel_commands);
+
+	return ret;
 }
 
 static int syna_read_config(struct udevice *dev)
@@ -327,7 +335,7 @@ static int syna_read_config(struct udevice *dev)
 		printf("hdmi node not found, assume disconnected: %d\n", hdmi_offset);
 	} else {
 		status = fdt_getprop(blob, hdmi_offset, "status", NULL);
-		if (strcmp(status, "okay") == 0)
+		if (status && strcmp(status, "okay") == 0)
 			priv->vpp_config_param.hdmitx_enable = 1;
 	}
 
@@ -336,7 +344,7 @@ static int syna_read_config(struct udevice *dev)
 		printf("dsi_panel node not found, assume disconnected: %d\n", mipidsi_offset);
 	} else {
 		status = fdt_getprop(blob, mipidsi_offset, "status", NULL);
-		if (strcmp(status, "okay") == 0)
+		if (status && strcmp(status, "okay") == 0)
 			priv->vpp_config_param.mipidsi_enable = 1;
 	}
 
@@ -365,8 +373,6 @@ static int syna_read_config(struct udevice *dev)
 int syna_parse_dt_entry(struct udevice *dev)
 {
 	struct berlin_fb_priv *priv = dev_get_priv(dev);
-	unsigned int node = dev_of_offset(dev);
-	const void *blob = gd->fdt_blob;
 	int ret;
 
 	priv->bpix = dev_read_u32_default(dev, "bpix", VIDEO_BPP32);

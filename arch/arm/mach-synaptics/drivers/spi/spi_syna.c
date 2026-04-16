@@ -282,13 +282,18 @@ static int syna_spi_xfer(struct udevice *dev, unsigned int bitlen,
 	const unsigned char *txp = plat->wbuffer;
 	unsigned char *rxp = din;
 
+	if (plat->wnum > sizeof(plat->wbuffer)) {
+		printf("write data length is too long, wnum = %d\n", plat->wnum);
+		return -EINVAL;
+	}
+
 	int wnum = plat->wnum;
 	int rnum = plat->rnum;
 
 	plat->wnum = 0;
 	plat->rnum = 0;
 
-	spi_debug("start xfer: txp = %p, rxp = %p, wnum = %d, rnum = %d\n", txp, rxp, wnum, rnum);
+	debug("start xfer: txp = %p, rxp = %p, wnum = %d, rnum = %d\n", txp, rxp, wnum, rnum);
 
 	if (wnum == 0 && rnum == 0)
 		return 0;

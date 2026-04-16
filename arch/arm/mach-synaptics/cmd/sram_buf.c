@@ -120,12 +120,10 @@ static int do_sram_buf_access(struct cmd_tbl *cmdtp, int flag, int argc,
 	return CMD_RET_FAILURE;
 }
 
-static const char sram_buf_help[] = "Access secure SRAM indexed buffer via SMC";
-
-static const char sram_buf_usage[] =
-	"<r|w> <idx> [value]\n"
-	"    - r 0       : Read 64-bit value from index 0\n"
-	"    - w 0 <val> : Write 64-bit value to index 0";
-
-U_BOOT_CMD(sram_buf, 5, 1, do_sram_buf_access, sram_buf_help, sram_buf_usage);
+U_BOOT_CMD(sram_buf, 5, 1, do_sram_buf_access,
+	   "Access secure SRAM indexed buffer via SMC",
+	   "<r|w> <idx> [value]\n"
+	   "    - r 0       : Read 64-bit value from index 0\n"
+	   "    - w 0 <val> : Write 64-bit value to index 0"
+);
 

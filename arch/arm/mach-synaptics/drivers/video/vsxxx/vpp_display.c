@@ -394,10 +394,15 @@ int syna_get_display_modeinfo(struct berlin_fb_priv *priv, int *width,
 
 void MV_VPPOBJ_StopDisplay(void)
 {
-	loop_isr_count = 0;
+	int timeout  = 1000;
 
-	while (loop_isr_count < WAIT_LOOP_COUNT)
+	WRITE_ONCE(loop_isr_count, 0);
+
+	while (READ_ONCE(loop_isr_count) < WAIT_LOOP_COUNT && timeout--)
 		mdelay(2);
+
+	if (timeout <= 0)
+		printf("StopDisplay timeout!\n");
 }
 
 void MV_VPPOBJ_DestroyDisplay(void)

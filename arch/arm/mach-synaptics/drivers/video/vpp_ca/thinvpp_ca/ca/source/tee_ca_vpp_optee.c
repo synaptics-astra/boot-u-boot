@@ -343,7 +343,7 @@ int VppOpenDispWin(int PlaneId, int WinX, int WinY, int WinW, int WinH,
 	param[2].u.value.b = BgClr;
 	param[3].attr = TEE_PARAM_ATTR_TYPE_VALUE_INOUT;
 	param[3].u.value.a = Alpha;
-	param[3].u.value.a |= (GlobalAlpha << 16);
+	param[3].u.value.a |= ((u64)GlobalAlpha << 16);
 	param[3].u.value.b = 0xdeadbeef;
 
 	ret = InvokeCommandHelper(VPP_OPENDISPWIN, param, 4);
@@ -405,7 +405,7 @@ int VppChangeDispWin(int PlaneId, int WinX, int WinY, int WinW, int WinH,
 	param[2].u.value.b = BgClr;
 	param[3].attr = TEE_PARAM_ATTR_TYPE_VALUE_INOUT;
 	param[3].u.value.a = Alpha;
-	param[3].u.value.a |= (GlobalAlpha << 16);
+	param[3].u.value.a |= ((u64)GlobalAlpha << 16);
 	param[3].u.value.b = 0xDEADBEEF;
 
 	ret = InvokeCommandHelper(VPP_CHANGEDISPWIN, param, 4);

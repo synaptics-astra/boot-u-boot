@@ -270,7 +270,7 @@ static int do_otp_read_public(struct cmd_tbl *cmdtp, int flag, int argc, char * 
 	memcpy((unsigned char *)pubOtp.TA_Vendor_SegID, shared_buf + 8, 24);
 
 	/* Gen2 row 74, shared_buf[32] */
-	memcpy((unsigned char *)pubOtp.TA_Vendor_GID, shared_buf + 32, 8);
+	memcpy((unsigned char *)pubOtp.TA_Vendor_GID, shared_buf + 32, 6);
 
 	/* Gen2 row 96 byte 2, shared_buf[40 + 2] */
 	memcpy((unsigned char *)&pubOtp.Security_Indicators, shared_buf + 40 + 2, 1);

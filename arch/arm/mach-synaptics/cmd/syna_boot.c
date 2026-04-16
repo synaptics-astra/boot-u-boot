@@ -269,6 +269,7 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 		if (ab_mode != BOOTSEL_A && ab_mode != BOOTSEL_B) {
 			printf("No bootable slots found for image loading, spinning...!!\n");
 			run_command("reset", 0);
+			goto out;
 		}
 		pt_name = (ab_mode == BOOTSEL_A) ?  KERNEL_A_NAME : KERNEL_B_NAME;
 		try_ab = 1;
@@ -280,6 +281,7 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 			if (ab_mode != BOOTSEL_A && ab_mode != BOOTSEL_B) {
 				printf("No bootable slots found for image loading, spinning...!!\n");
 				run_command("reset", 0);
+				goto out;
 			}
 			pt_name = (ab_mode == BOOTSEL_A) ?  KERNEL_A_NAME : KERNEL_B_NAME;
 			try_ab = 1;

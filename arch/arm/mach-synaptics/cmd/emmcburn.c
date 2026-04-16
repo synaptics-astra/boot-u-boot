@@ -428,7 +428,7 @@ static void gpt_convert_efi_name_to_char(char *s, efi_char16_t *es, int n)
 
 static int get_partition_info(char *pt_name, struct pt_info *pi)
 {
-	unsigned int num = 0;
+	int num = 0;
 	unsigned int index = 0;
 
 	if (read_all_gpt_partition_info())
@@ -516,6 +516,9 @@ static int burn_images(struct pt_info pi, void *buff, unsigned int size)
 	int ret = -1;
 	unsigned int cnt = 0;
 
+	if (!buff)
+		return -EINVAL;
+
 #if defined(CONFIG_CMD_UNZIP)
 	if (buff && (*((u16 *)buff) == GZIP_MAGIC_NUMBER)) {
 		printf("Image format: gzip\n");
@@ -570,8 +573,10 @@ static int dl_and_burn_img(char *src, char *path, char *imgname, char *pt)
 	max_alloc = min(max_alloc, pi.cnt * get_blksize());
 	printf("allocated 0x%llx bytes memory\n", max_alloc);
 	buff = malloc_cache_aligned(max_alloc);
+	if (!buff)
+		return -ENOMEM;
 
-	sprintf(cmd, "imgload %s %s%s 0x%p", src, path, imgname, buff);
+	sprintf(cmd, "imgload %s %s%s 0x%p", src ? src : "", path, imgname, buff);
 
 	printf("allocated memory address 0x%p\n", buff);
 	ret = run_command(cmd, 0);
@@ -790,6 +795,8 @@ static int parse_part_and_gen_gpt(void *buff, unsigned int size)
 	}
 
 	partitions = malloc_cache_aligned(MAX_GPT_PT_NUM * sizeof(struct disk_partition));
+	if (!partitions)
+		goto out;
 
 	for (i = 0; i < 5; i++) {
 		p_buff += len + 1;
@@ -878,6 +885,9 @@ static int get_part_name_from_img_name(char *src, char *partlst, char *imgname)
 		return -1;
 
 	buff = malloc_cache_aligned(0x1000); //4K for emmc_image_list, should be enough
+	if (!buff)
+		return -ENOMEM;
+
 	memset(buff, 0, 0x1000);
 	sprintf(cmd, "imgload %s %s 0x%p", src, partlst, buff);
 
@@ -915,7 +925,7 @@ static int get_part_name_from_img_name(char *src, char *partlst, char *imgname)
 			return -1;
 		}
 		if (find_str_in_list(imgname, import_argv[0], ',')) {
-			sprintf(tmp_part_name, "sd%d", partition_num + 1);
+			snprintf(tmp_part_name, sizeof(tmp_part_name), "sd%d", partition_num + 1);
 			if (strlen(partlist_name) > 0) {
 				strcat(partlist_name, ",");
 				strcat(partlist_name, tmp_part_name);
@@ -971,6 +981,9 @@ static int pt_operation_serialization(char *src, char *imglst, struct pt_operati
 
 	//dl emmc_image_list
 	buff = malloc_cache_aligned(0x1000); //4K for emmc_image_list, should be enough
+	if (!buff)
+		return -ENOMEM;
+
 	memset(buff, 0, 0x1000);
 	sprintf(cmd, "imgload %s %s 0x%p", src, imglst, buff);
 
@@ -1030,7 +1043,7 @@ static void print_img2sd_msg(struct pt_operation ptop, char *path, char *src)
 	case BURN_IMAGE:
 		printf("WRITE: start to write %s/%s to partition %s\n",
 		       path, ptop.imgname, ptop.pt_name);
-		printf("SOURCE: %s\n", src);
+		printf("SOURCE: %s\n", src ? src : "");
 		break;
 	default:
 		printf("something wrong with img2sd!!!\n");
@@ -1081,6 +1094,9 @@ static int do_emmc_part(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 	imgname = argv[3];
 
 	buff = malloc_cache_aligned(0x1000); //4K for emmc_part_list, should be enough
+	if (!buff)
+		goto ERROR;
+
 	memset(buff, 0, 0x1000);
 	sprintf(cmd, "imgload %s %s 0x%p", src, imgname, buff);
 
@@ -1140,7 +1156,13 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 			ignore_partition_list = argv[4];
 		}
 
+		if (!src || !img_list)
+			goto ERROR;
+
 		ptop = malloc_cache_aligned(MAX_GPT_PT_NUM * sizeof(struct pt_operation));
+		if (!ptop)
+			goto ERROR;
+
 		memset(ptop, 0, (MAX_GPT_PT_NUM * sizeof(struct pt_operation)));
 
 		//use ptop->imgname temperatorily. will be overwritten next function
@@ -1153,13 +1175,16 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 		}
 	} else {
 		ptop = malloc_cache_aligned(sizeof(struct pt_operation));
+		if (!ptop)
+			goto ERROR;
+
 		if (strcmp(argv[1], "erase") == 0) {
 			ptop->op = ERASE_PT;
-			strcpy(ptop->pt_name, argv[2]);
+			snprintf(ptop->pt_name, sizeof(ptop->pt_name), "%s", argv[2]);
 			imgpath[0] = '\0';
 		} else if (strcmp(argv[1], "format") == 0) {
 			ptop->op = FORMAT_PT;
-			strcpy(ptop->pt_name, argv[2]);
+			snprintf(ptop->pt_name, sizeof(ptop->pt_name), "%s", argv[2]);
 			imgpath[0] = '\0';
 		} else {
 			//img2sd [src] [image] [partition]
@@ -1177,7 +1202,11 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 				img = argv[2];
 				pt = argv[3];
 			}
-			strcpy(ptop->pt_name, pt);
+
+			if (!src || !img)
+				goto ERROR;
+
+			snprintf(ptop->pt_name, sizeof(ptop->pt_name), "%s", pt ? pt : "");
 			get_image_path_and_name(img, imgpath, name);
 			strcpy(ptop->imgname, name);
 		}
@@ -1197,7 +1226,6 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 		if (ptop[i].op == ERASE_PT) {
 			ret = erase_partition_by_name(ptop[i].pt_name);
 			if (ret) {
-				free(ptop);
 				printf("erase %s failed!!!\n", ptop[i].pt_name);
 				goto ERROR;
 			}
@@ -1206,14 +1234,12 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 			//will do it later
 			ret = format_partition_by_name(ptop[i].pt_name);
 			if (ret) {
-				free(ptop);
 				printf("format %s failed!!!\n", ptop[i].pt_name);
 				goto ERROR;
 			}
 		} else if (ptop[i].op == BURN_IMAGE) {
 			ret = dl_and_burn_img(src, imgpath, ptop[i].imgname, ptop[i].pt_name);
 			if (ret) {
-				free(ptop);
 				printf("%s: [%s] burn failed\n", __func__, ptop[i].imgname);
 				goto ERROR;
 			}
@@ -1225,6 +1251,9 @@ static int do_img2sd(struct cmd_tbl *cmdtp, int flag, int argc, char * const arg
 	printf("%s: time cost %ld ms on mmc%d\n", __func__, timer, curr_device);
 	return 0;
 ERROR:
+	if (ptop)
+		free(ptop);
+
 	printf("CMD_PART: img2sd failed\n");
 	return -1;
 }
@@ -1319,7 +1348,7 @@ static int do_list2emmc(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 	//parse image list and burn image
 	if (develop_mode)
 		sprintf(cmd, "img2sd import %s %s %s",
-			srcstr[src], img_list, ignore_partition_list);
+			srcstr[src], img_list, ignore_partition_list ? ignore_partition_list : "");
 	else
 		sprintf(cmd, "img2sd import %s %s", srcstr[src], img_list);
 	ret = run_command(cmd, 0);

@@ -374,7 +374,7 @@ static int dwcmshc_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	struct mmc_data data;
 	struct sdhci_host *host = dev_get_priv(mmc->dev);
 	struct dwcmshc_sdhci_plat *plat = dev_get_plat(mmc->dev);
-	char tuning_loop_counter = SDHCI_TUNING_LOOP_COUNT;
+	int tuning_loop_counter = SDHCI_TUNING_LOOP_COUNT;
 	u32 timeout = 100;
 	u32 offset, val;
 	u16 valw;

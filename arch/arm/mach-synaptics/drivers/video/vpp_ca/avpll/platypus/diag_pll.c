@@ -734,7 +734,7 @@ int diag_change_avpll(unsigned int apll_index, unsigned int freq,
 	ret = diag_change_pll(apll_index + 5, freq, freq, ssc, ssc_freq, ssc_amp, ssc_mode, calc,
 			      pll_cfg);
 
-	if (apll_index < 0 || apll_index > 3) {
+	if (apll_index > 3) {
 		debug("INVALID input apll index!\n");
 		return -1;
 	}

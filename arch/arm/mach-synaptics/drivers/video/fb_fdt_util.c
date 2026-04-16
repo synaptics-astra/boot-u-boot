@@ -92,7 +92,7 @@ static void get_mmc_part(char *mmc_part)
 		     f_mmc_get_part_index(mmc_dev, ROOTFS_A) :
 		     f_mmc_get_part_index(mmc_dev, ROOTFS_B);
 
-	sprintf(mmc_part, "%x:%x", mmc_dev, part_index);
+	snprintf(mmc_part, MAX_MMCPART_STR_SIZE, "%x:%x", mmc_dev, part_index);
 }
 
 /* Helper function to load and apply a single DTBO */
@@ -267,6 +267,7 @@ static int is_file_exists(const char *dtbo_env, char *path, char *mmc_part)
 static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 {
 	char *copy, *tok;
+	int ret = -1;
 
 	/* Empty dtbo env is valid */
 	if (!dtbo_env)
@@ -291,14 +292,18 @@ static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 
 		if (ret < 0) {
 			printf("File <%s> doesn't exist at path <%s>: %d\n", tok, path, ret);
-			return ret;
+			goto out;
 		}
 
 		tok = strtok(NULL, " ,");
 	}
 
 	/* All dtbo tokens available, return success*/
-	return 0;
+	ret = 0;
+
+out:
+	free(copy);
+	return ret;
 }
 
 /*

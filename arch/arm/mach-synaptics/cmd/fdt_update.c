@@ -266,7 +266,7 @@ static int setup_system_mem(void *fdt, struct mem_region *system_mem, int system
 int setup_tz_mem(void *fdt)
 {
 	struct mem_region ion_mem[MAX_REGION_COUNT];
-	struct mem_region system_mem[MAX_SYSTEM_POOL_NUM];
+	struct mem_region system_mem[MAX_SYSTEM_SLOT];
 	struct mem_region bl_mem[1];
 	struct mem_region reserved_mem[MAX_REGION_COUNT];
 
@@ -327,9 +327,10 @@ static void setup_rootfs(char *bootargs)
 
 	if (hwpart >= 0  && index >= 0) {
 		if (hwpart >= 4)
-			sprintf(index_str, "%dgp%dp%d", mmc_dev_lk, hwpart - 4, index);
+			snprintf(index_str, sizeof(index_str), "%dgp%dp%d",
+				 mmc_dev_lk, hwpart - 4, index);
 		else
-			sprintf(index_str, "%dp%d", mmc_dev_lk, index);
+			snprintf(index_str, sizeof(index_str), "%dp%d", mmc_dev_lk, index);
 
 		strcat(bootargs, index_str);
 		strcat(bootargs, " ro");
@@ -401,6 +402,8 @@ int setup_bootargs(void *fdt)
 #endif
 
 	env_set("bootargs", newbootargs);
+
+	free(newbootargs);
 
 	return 0;
 }

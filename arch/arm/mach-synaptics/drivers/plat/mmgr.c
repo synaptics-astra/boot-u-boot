@@ -101,6 +101,11 @@ void init_mmgr_by_type(MEM_TYPE type, unsigned long mstart, unsigned int size)
 	//init the first point
 	mmgr->num = 0;
 	mmgr->p_free = find_valid_node_from_pool(mmgr, mmgr->pool);
+	if (!mmgr->p_free) {
+		printf("mmgr has no blank node\n");
+		return;
+	}
+
 	mmgr->p_free->base = mmgr->membase;
 	mmgr->p_free->size = mmgr->totalsize;
 	mmgr->p_free->prev = NULL;
@@ -152,6 +157,10 @@ void *mmgr_alloc_by_type(MEM_TYPE type, int size)
 
 			//handle the new allocated node
 			Mnode *new = find_valid_node_from_pool(mmgr, mmgr->pool);
+			if (!new) {
+				printf("mmgr has no blank node\n");
+				return NULL;
+			}
 
 			new->base = p->base;
 			//Allocate from end of the block for topdown approach
