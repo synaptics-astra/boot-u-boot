@@ -923,6 +923,7 @@ static struct spi_flash *flash;
 struct mtd_info *fb_spi_setup_mtd_dev(void)
 {
 	struct udevice *new, *bus_dev;
+	char mtdids_buf[64];
 	int ret;
 
 	if (flash)
@@ -941,8 +942,11 @@ struct mtd_info *fb_spi_setup_mtd_dev(void)
 
 	flash = dev_get_uclass_priv(new);
 
-	if (flash)
+	if (flash) {
+		snprintf(mtdids_buf, sizeof(mtdids_buf), "%s=%s", flash->mtd.name, flash->mtd.name);
+		env_set("mtdids", mtdids_buf);
 		return &flash->mtd;
+	}
 
 	return NULL;
 }
