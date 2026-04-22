@@ -132,4 +132,13 @@ int mmc_switch_part(struct mmc *mmc, unsigned int part_num);
  */
 int mmc_switch(struct mmc *mmc, u8 set, u8 index, u8 value);
 
+#ifdef CONFIG_ARCH_SYNAPTICS
+#include "misc_syna.h"
+#else
+static inline int get_mmc_boot_dev(void)
+{
+	return 0;
+}
+#endif
+
 #endif /* _MMC_PRIVATE_H_ */

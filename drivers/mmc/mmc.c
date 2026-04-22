@@ -3300,6 +3300,9 @@ int mmc_set_bkops_enable(struct mmc *mmc, bool autobkops, bool enable)
 
 __weak int mmc_get_env_dev(void)
 {
+	if (IS_ENABLED(CONFIG_ARCH_SYNAPTICS))
+		return get_mmc_boot_dev();
+
 #ifdef CONFIG_SYS_MMC_ENV_DEV
 	return CONFIG_SYS_MMC_ENV_DEV;
 #else
