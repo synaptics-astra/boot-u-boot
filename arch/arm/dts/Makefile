@@ -1285,7 +1285,7 @@ dtb-$(CONFIG_TARGET_CORSTONE1000) += corstone1000-mps3.dtb \
 
 dtb-$(CONFIG_TARGET_KLAMATH) += klamath-rdk.dtb
 dtb-$(CONFIG_TARGET_KLAMATH) += klamath-rdk-nand.dtb
-dtb-$(CONFIG_TARGET_KLAMATH) += klamath-coral.dtb
+dtb-$(CONFIG_TARGET_KLAMATH) += klamath-coralboard.dtb
 dtb-$(CONFIG_TARGET_MYNA2) += myna2-rdk.dtb
 dtb-$(CONFIG_TARGET_MYNA2) += myna2-rdk-usb.dtb
 dtb-$(CONFIG_TARGET_MYNA2) += myna2-rdk-usb-suboot.dtb

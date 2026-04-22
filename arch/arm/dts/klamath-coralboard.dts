@@ -28,7 +28,7 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
-	model = "Synaptics Klamath Coral";
+	model = "Synaptics Klamath Coralboard";
 	compatible = "Synaptics,klamath", "Synaptics,asserial";
 
 	memory {
