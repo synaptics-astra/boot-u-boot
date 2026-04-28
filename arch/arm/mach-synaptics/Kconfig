@@ -94,19 +94,19 @@ config SYNA_USB_SUBOOT
 endchoice
 
 config SYNA_SPI_VT_OFFSET
-	hex "SPI version table offset"
-	depends on SYNA_SPI_SUBOOT
-	default 0x4F800 if CADENCE_XSPI
-	default 0x7F800
+	hex "SPI version table offset" if SYNA_SPI_SUBOOT
+	default 0x4F800 if SYNA_SPI_SUBOOT && CADENCE_XSPI
+	default 0x7F800 if SYNA_SPI_SUBOOT
+	default 0
 	help
 	  Version table offset used when loading partition information
 	  from SPI NOR flash.
 
 config SYNA_SPI_BOOT_PART_SIZE
-	hex "SPI boot partition size"
-	depends on SYNA_SPI_SUBOOT
-	default 0x1f0000 if CADENCE_XSPI
-	default 0x200000
+	hex "SPI boot partition size" if SYNA_SPI_SUBOOT
+	default 0x1f0000 if SYNA_SPI_SUBOOT && CADENCE_XSPI
+	default 0x200000 if SYNA_SPI_SUBOOT
+	default 0
 	help
 	  Boot partition size used when loading partition information
 	  from SPI NOR flash.
