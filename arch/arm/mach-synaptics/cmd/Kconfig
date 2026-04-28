@@ -40,4 +40,8 @@ config CMD_SYNA_FLASH
 config CMD_SYNA_SPI_BURNING
 	bool "Enable burning image to spi flash"
 	depends on MTD_NOR_FLASH
+
+config CMD_SYNA_SPINAND_BURNING
+	bool "Enable burning image to spinand flash"
+	depends on MTD_SPI_NAND
 endmenu

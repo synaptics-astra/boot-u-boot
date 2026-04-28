@@ -32,3 +32,5 @@ obj-$(CONFIG_CMD_SYNA_OTP) += otp.o
 obj-$(CONFIG_CMD_SYNA_SRAM_BUF) += sram_buf.o
 obj-$(CONFIG_CMD_SYNA_MTDPARTS) += syna_mtdparts.o
 obj-$(CONFIG_CMD_SYNA_SPI_BURNING) += spiburn.o
+obj-$(CONFIG_CMD_SYNA_SPINAND_BURNING) += spinandburn.o
+
