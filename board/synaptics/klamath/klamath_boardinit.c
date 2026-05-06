@@ -235,6 +235,26 @@ static void set_drive_strength(void)
 	}
 }
 
+static void set_pin_status(void)
+{
+	unsigned int offset, val;
+
+	/* disable IE bit for RGMII2 TX pins */
+	for (offset = RA_Gbl_GPIO48Cntl; offset <= RA_Gbl_GPIO58Cntl; offset += 4) {
+		switch (offset) {
+		case RA_Gbl_GPIO48Cntl ... RA_Gbl_GPIO51Cntl: /* RGMII2 */
+		case RA_Gbl_GPIO57Cntl ... RA_Gbl_GPIO58Cntl: /* RGMII2 */
+			val = readl(MEMMAP_CHIP_CTRL_REG_BASE + offset);
+			val &= ~0x10UL;
+			writel(val, MEMMAP_CHIP_CTRL_REG_BASE + offset);
+			break;
+
+		default:
+			break;
+		}
+	}
+}
+
 static void tw_init_mdio(void)
 {
 	u32 val;
@@ -252,6 +272,7 @@ int board_init(void)
 	init_clock();
 
 	set_drive_strength();
+	set_pin_status();
 	tw_init_mdio();
 
 	return 0;
