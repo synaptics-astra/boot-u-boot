@@ -194,16 +194,27 @@ static void init_clock(void)
 
 static void set_drive_strength(void)
 {
-	unsigned int val;
-	unsigned int offset;
+	unsigned int offset, val, drv;
 
 	/* SOC, total 50 pads, all have 4bits DS
 	 *      0x08800 GPIO23Cntl ... 0x088EC GPIO22Cntl
 	 */
 	for (offset = RA_Gbl_GPIO23Cntl; offset <= RA_Gbl_GPIO22Cntl; offset += 4) {
+		switch (offset) {
+		case RA_Gbl_GPIO16Cntl ... RA_Gbl_GPIO21Cntl: /* SDIO2 */
+		case RA_Gbl_GPIO48Cntl ... RA_Gbl_GPIO51Cntl: /* RGMII2 */
+		case RA_Gbl_GPIO57Cntl ... RA_Gbl_GPIO58Cntl: /* RGMII2 */
+			drv = 0xA;
+			break;
+
+		default:
+			drv = 0x7;
+			break;
+		}
+
 		val = readl(MEMMAP_CHIP_CTRL_REG_BASE + offset);
 		val &= ~0xfUL;
-		val |= 7;
+		val |= drv;
 		writel(val, MEMMAP_CHIP_CTRL_REG_BASE + offset);
 	}
 
