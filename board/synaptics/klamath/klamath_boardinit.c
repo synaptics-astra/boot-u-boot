@@ -253,6 +253,11 @@ static void set_pin_status(void)
 			break;
 		}
 	}
+
+	/* disable PE bit for SDIO2 CLK */
+	val = readl(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl);
+	val &= ~0x20UL;
+	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl);
 }
 
 static void tw_init_mdio(void)
