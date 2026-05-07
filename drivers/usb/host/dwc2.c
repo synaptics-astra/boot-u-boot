@@ -73,6 +73,12 @@ DEFINE_ALIGN_BUFFER(uint8_t, status_buffer_addr, DWC2_STATUS_BUF_SIZE,
 static struct dwc2_priv local;
 #endif
 
+#if CONFIG_IS_ENABLED(DM_USB)
+static int dwc2_setup_phy(struct udevice *dev);
+#else
+static inline int dwc2_setup_phy(struct udevice *dev) {	return 0; }
+#endif
+
 /*
  * DWC2 IP interface
  */
@@ -1165,6 +1171,13 @@ static int dwc2_reset(struct udevice *dev)
 
 	/* force reset to clear all IP register */
 	reset_assert_bulk(&priv->resets);
+
+	if (IS_ENABLED(CONFIG_DM_USB) && IS_ENABLED(CONFIG_ARCH_SYNAPTICS)) {
+		ret = dwc2_setup_phy(dev);
+		if (ret)
+			return ret;
+	}
+
 	ret = reset_deassert_bulk(&priv->resets);
 	if (ret) {
 		reset_release_bulk(&priv->resets);
@@ -1427,9 +1440,11 @@ static int dwc2_usb_probe(struct udevice *dev)
 	if (ret)
 		return ret;
 
-	ret = dwc2_setup_phy(dev);
-	if (ret)
-		return ret;
+	if (!IS_ENABLED(CONFIG_ARCH_SYNAPTICS)) {
+		ret = dwc2_setup_phy(dev);
+		if (ret)
+			return ret;
+	}
 
 	return dwc2_init_common(dev, priv);
 }
