@@ -276,6 +276,17 @@
 			status = "disabled";
 		};
 
+		sdhci1: sdhci@f7a01000 {
+			compatible = "snps,dwcmshc-sdhci";
+			reg = <0xf7a01000 0x1000>;
+			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&sdioclk>, <&sdioclk>;
+			clock-names = "core", "bus";
+			resets = <&reset 0x350 2 0 1>;
+			bus-width = <4>;
+			status = "disabled";
+		};
+
 		sdhci2: sdhci@f7a02000 {
 			compatible = "snps,dwcmshc-sdhci";
 			reg = <0xf7a02000 0x1000>;
@@ -371,6 +382,13 @@
 			reg = <0xf7e18000 0x18>;
 		};
 
+		ipc: ipc@f7e22000 {
+			compatible = "syna,klamath-ipc";
+			reg = <0xf7e22000 0x60>;
+			#mbox-cells = <1>;
+			status = "disabled";
+		};
+
 		gic: interrupt-controller@f7e59000 {
 			compatible = "arm,gic-400";
 			#interrupt-cells = <3>;
@@ -419,6 +437,22 @@
 				interrupt-controller;
 				#interrupt-cells = <2>;
 				interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
+			};
+		};
+
+		drm: drm {
+			compatible = "syna,lcdc-fb";
+			status = "disabled";
+			bootph-some-ram;
+
+			lcdc_panel {
+				compatible = "syna,drm-lcdc";
+				status = "disabled";
+			};
+
+			dsi_panel {
+				compatible = "syna,drm-dsi";
+				status = "disabled";
 			};
 		};
 	};
