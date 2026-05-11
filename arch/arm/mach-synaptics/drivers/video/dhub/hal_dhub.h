@@ -28,7 +28,22 @@
  */
 
 #include	"ctypes.h"
-#include	"avio_dhub_cfg_prv.h"
+
+/*
+ * Generic DHUB IDs and handle accessor - placed here so all consumers of
+ * hal_dhub.h (including syna_lcdc_dev.h via bcmbuf.h) see these types
+ * without needing a chip-specific avio_dhub_cfg_prv.h on the include path.
+ */
+typedef enum _DHUB_ID_ {
+	DHUB_ID_AG_DHUB = 0,
+	DHUB_ID_VPP_DHUB,
+	DHUB_ID_VIP_DHUB,
+	DHUB_ID_AIP_DHUB,
+	DHUB_ID_MAX,
+} DHUB_ID;
+
+struct HDL_dhub2d;
+struct HDL_dhub2d *Dhub_GetDhub2dHandle_ByDhubId(DHUB_ID id);
 
 typedef struct HDL_semaphore {
 	UNSG32 ra;		/*!     Base address of $SemaHub ! */

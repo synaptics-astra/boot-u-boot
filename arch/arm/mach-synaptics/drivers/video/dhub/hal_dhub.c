@@ -24,6 +24,7 @@
 
 #include "ctypes.h"
 #include "io.h"
+#include "avio_dhub_cfg_prv.h"
 #include "hal_dhub.h"
 #include "avioDhub.h"
 #include "avio.h"
@@ -41,7 +42,11 @@
 
 #define	bTST(x, b)			(((x) >> (b)) & 1)
 
+#ifdef AVIO_MEMMAP_VPP_BCMQ_REG_BASE
+#define MEMMAP_AVIO_BCM_REG_BASE (MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_VPP_BCMQ_REG_BASE)
+#else
 #define MEMMAP_AVIO_BCM_REG_BASE (MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_BCM_REG_BASE)
+#endif
 
 #define xdbg(fmt, ...) do { } while (0)
 #undef IO32CFG

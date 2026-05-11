@@ -25,6 +25,7 @@
 #include <linux/types.h>
 #include <malloc.h>
 #include <string.h>
+#include "lcdc_cfg_prv.h"
 #include "Galois_memmap.h"
 #include "avioGbl.h"
 #include "avio_memmap.h"
@@ -65,22 +66,15 @@ static void syna_lcdc_hw_param_update(struct syna_lcdc_dev *dev)
 		syna_lcdc_writel(dev, LCDC_REG_LCDCCR, 1);
 }
 
-static void syna_lcdc_wrap_interrupt_enable(void)
-{
-	unsigned int addr;
-	T32avioGbl_INTR_CTRL lcdc_intr;
-
-	addr = SYNA_MEMMAP_AVIO_GBL_BASE + RA_avioGbl_INTR_CTRL;
-	GA_REG_WORD32_READ(addr, &lcdc_intr.u32);
-	lcdc_intr.uINTR_CTRL_mipi_int_en = 1;
-	lcdc_intr.uINTR_CTRL_lcdc1_int_en = 1;
-	lcdc_intr.uINTR_CTRL_lcdc2_int_en = 1;
-	GA_REG_WORD32_WRITE(addr, lcdc_intr.u32);
-}
-
 static void syna_lcdc_semaintr_enable(int intr, int enable)
 {
-	HDL_semaphore *pSemHandle = dhub_semaphore(&VPP_dhubHandle.dhub);
+	HDL_dhub2d *vpp_dhubHandle = SYNA_LCDC_VPP_DHUB_HANDLE;
+
+	if (!vpp_dhubHandle) {
+		debug("invalid vpp dhub Handle\n");
+		return;
+	}
+	HDL_semaphore *pSemHandle = dhub_semaphore(&vpp_dhubHandle->dhub);
 
 	semaphore_cfg(pSemHandle, intr, 1, 0);
 	semaphore_clr_full(pSemHandle, intr);
@@ -90,9 +84,9 @@ static void syna_lcdc_semaintr_enable(int intr, int enable)
 static void syna_lcdc_wrap_lcdcclk_enable(void)
 {
 	unsigned int addr;
-	T32avioGbl_LCDC_CTRL lcdc_ctrl;
+	T32avioVppGbl_LCDC_CTRL lcdc_ctrl;
 
-	addr = MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE + RA_avioGbl_LCDC_CTRL;
+	addr = SYNA_MEMMAP_AVIO_VPP_GBL_LCDC_CTRL;
 	GA_REG_WORD32_READ(addr, &lcdc_ctrl.u32);
 	lcdc_ctrl.uLCDC_CTRL_lcdc1_clk_sel = 0;
 	lcdc_ctrl.uLCDC_CTRL_lcdc1_ClkEn = 1;
@@ -116,14 +110,14 @@ static void syna_lcdc_wrap_lcdcclk_enable(void)
 static void syna_lcdc_wrap_clkgating_disable(void)
 {
 	unsigned int addr;
-	T32avioGbl_CTRL gbl_ctrl;
+	T32avioVppGbl_CTRL gbl_ctrl;
 
-	addr = MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE + RA_avioGbl_CTRL;
+	addr = SYNA_MEMMAP_AVIO_VPP_GBL_CTRL;
 	GA_REG_WORD32_READ(addr, &gbl_ctrl.u32);
-	gbl_ctrl.uCTRL_AIODHUB_dyCG_en = 0;
-	gbl_ctrl.uCTRL_AIODHUB_CG_en = 0;
-	gbl_ctrl.uCTRL_VPPDHUB_dyCG_en = 0;
-	gbl_ctrl.uCTRL_VPPDHUB_CG_en = 0;
+
+	SYNA_LCDC_AIODHUB_CG_DISABLE(gbl_ctrl);
+	SYNA_LCDC_VPPDHUB_CG_DISABLE(gbl_ctrl);
+
 	GA_REG_WORD32_WRITE(addr, gbl_ctrl.u32);
 }
 
@@ -332,17 +326,14 @@ static struct syna_lcdc_dev *syna_lcdc_create(int num, SYNA_LCDC_PANEL *panel)
 	if (!dev)
 		return NULL;
 
-	memset(dev, 0, sizeof(struct syna_lcdc_dev));
+	dev->core_addr = SYNA_LCDC_GET_BASE_ADDRESS(num);
 
-	if (!num)
-		dev->core_addr = MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_LCDC1_REG_BASE;
-	else
-		dev->core_addr = MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_LCDC2_REG_BASE;
-	//Save panel device pointer
 	dev->panel = panel;
 
-	if (syna_lcdc_dlr_create(dev, num) != SYNA_LCDC_OK)
+	if (syna_lcdc_dlr_create(dev, num) != SYNA_LCDC_OK) {
+		free(dev);
 		return NULL;
+	}
 
 	return dev;
 }
@@ -358,6 +349,13 @@ int syna_lcdc_pushframe(int lcdcID, void *pnew)
 void syna_lcdc_hw_config(int lcdcID, SYNA_LCDC_PANEL *panelcfg)
 {
 	if (!syna_lcdc[lcdcID]->isTGConfig) {
+		HDL_dhub2d *vpp_dhubHandle = SYNA_LCDC_VPP_DHUB_HANDLE;
+
+		if (!vpp_dhubHandle) {
+			debug("invalid vpp dhub Handle\n");
+			return;
+		}
+
 		memcpy(syna_lcdc[lcdcID]->panel, panelcfg, sizeof(SYNA_LCDC_PANEL));
 
 		// FIX ME: Caller Should Differentiate CPU type or RGB i/f
@@ -380,7 +378,9 @@ void syna_lcdc_irq(int intrMask)
 	int stat, i;
 
 	for (i = 0; i < SYNA_LCDC_MAX; i++) {
-		if (intrMask & ((1 << (avioDhubSemMap_vpp128b_vpp_inr0 + i)))) {
+		if (!syna_lcdc[i] || !syna_lcdc[i]->core_addr)
+			continue;
+		if (intrMask & (1 << syna_lcdc[i]->intrID)) {
 			dev = syna_lcdc[i];
 			/* read & clear active interrupts */
 
@@ -423,18 +423,17 @@ static int syna_lcdc_dev_init(void)
 	SYNA_LCDC_PANEL *syna_panel_config;
 
 	/*FIXME: configure based on resolution configuration*/
-	GA_REG_WORD32_WRITE(MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE +
-		RA_avioGbl_VPLL0_WRAP + RA_VPLL_WRAP_VPLL_CTRL, 0x820);
-	GA_REG_WORD32_WRITE(MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE +
-		RA_avioGbl_VPLL1_WRAP + RA_VPLL_WRAP_VPLL_CTRL,	0x820);
-	GA_REG_WORD32_WRITE(MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE +
-		RA_avioGbl_AVPLLA_CLK_EN, 0x4F);
-	GA_REG_WORD32_WRITE(MEMMAP_AVIO_REG_BASE + AVIO_MEMMAP_AVIO_GBL_BASE +
-		RA_avioGbl_LCDC2_CTRL, 0x39);
+	GA_REG_WORD32_WRITE(SYNA_MEMMAP_AVIO_VPP_GBL_BASE +
+		RA_avioVppGbl_VPLL0_WRAP + RA_VPLL_WRAP_VPLL_CTRL, 0x820);
+	GA_REG_WORD32_WRITE(SYNA_MEMMAP_AVIO_VPP_GBL_BASE +
+		RA_avioVppGbl_VPPL1_WRAP + RA_VPLL_WRAP_VPLL_CTRL, 0x820);
+	GA_REG_WORD32_WRITE(SYNA_MEMMAP_AVIO_VPP_GBL_AVPLLA_CLK_EN, 0x4F);
+	GA_REG_WORD32_WRITE(SYNA_MEMMAP_AVIO_VPP_GBL_BASE +
+		RA_avioVppGbl_LCDC2_CTRL, 0x39);
 
 	syna_lcdc_wrap_lcdcclk_enable();
 	syna_lcdc_wrap_clkgating_disable();
-	syna_lcdc_wrap_interrupt_enable();
+	syna_lcdc_cfg_wrap_interrupt_enable();
 
 	for (i = 0; i < SYNA_LCDC_MAX; i++) {
 		syna_panel_config = (SYNA_LCDC_PANEL *)malloc(sizeof(struct syna_lcdc_dev));
@@ -449,6 +448,7 @@ static int syna_lcdc_dev_init(void)
 			if (i == 1)
 				syna_lcdc_destroy(0);
 
+			free(syna_panel_config);
 			return SYNA_LCDC_EBADPARAM;
 		}
 		syna_lcdc[i]->m_srcfmt = -1;
@@ -470,6 +470,9 @@ void syna_lcdc_clear_disable_interrupts(void)
 	int i;
 
 	for (i = 0; i < SYNA_LCDC_MAX; i++) {
+		if (!syna_lcdc[i] || !syna_lcdc[i]->core_addr)
+			continue;
+
 		/* clear all pending interrupts */
 		if (syna_lcdc[i]->en_intr_handler) {
 			/* Wait for MIN interrupts to push atleast a frame to o/p */

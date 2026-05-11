@@ -30,24 +30,6 @@
 
 #define CPUINDEX    0
 
-typedef enum DHUB_128bBCM_TYPE_s {
-	DHUB_128bBCM_TYPE_64b,
-	DHUB_128bBCM_TYPE_128b,
-} DHUB_128bBCM_TYPE;
-
-typedef enum _DHUB_TYPE_ {
-	DHUB_TYPE_64BIT,
-	DHUB_TYPE_128BIT,
-} DHUB_TYPE;
-
-typedef enum _DHUB_ID_ {
-	DHUB_ID_AG_DHUB,
-	DHUB_ID_VPP_DHUB,
-	DHUB_ID_VIP_DHUB,
-	DHUB_ID_AIP_DHUB,
-	DHUB_ID_MAX,
-} DHUB_ID;
-
 HDL_dhub2d AG_dhubHandle;
 HDL_dhub2d VPP_dhubHandle;
 
@@ -210,3 +192,11 @@ int drv_dhub_initialize_dhub(void *h_dhub_ctx)
 	return 0;
 }
 
+struct HDL_dhub2d *Dhub_GetDhub2dHandle_ByDhubId(DHUB_ID id)
+{
+	if (id == DHUB_ID_AG_DHUB)
+		return &AG_dhubHandle;
+	if (id == DHUB_ID_VPP_DHUB)
+		return &VPP_dhubHandle;
+	return NULL;
+}

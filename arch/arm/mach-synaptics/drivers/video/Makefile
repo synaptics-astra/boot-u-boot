@@ -26,9 +26,7 @@ PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/tz
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/utils
 PLATFORM_CPPFLAGS += -I$(srctree)/include/linux
 PLATFORM_CPPFLAGS += -I$(srctree)/../../common/inc
-PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/lcdc/include
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/dhub/
-PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/dhub/myna2/
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/dsi
 PLATFORM_CPPFLAGS += -I$(srctree)/drivers/video
 PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/bridge/
@@ -37,6 +35,7 @@ PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/panel/$(
 
 ifneq ($(filter y, $(CONFIG_TARGET_DOLPHIN) $(CONFIG_TARGET_PLATYPUS)), )
     PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/vsxxx
+    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/lcdc/include
     PLATFORM_CPPFLAGS += -DLOGO_SRC_FMT=0
     PLATFORM_CPPFLAGS += -DCONFIG_OPTEE -DCONFIG_GENX_ENABLE
 
@@ -62,10 +61,8 @@ ifdef CONFIG_TARGET_PLATYPUS
     obj-y += vpp_ca/avpll/platypus/diag_pll.o
 endif
 
-ifdef CONFIG_TARGET_MYNA2
-    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/vpp_ca/avpll/myna2/
+ifneq ($(filter y, $(CONFIG_TARGET_KLAMATH) $(CONFIG_TARGET_MYNA2)), )
     PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/asxxx
-    PLATFORM_CPPFLAGS += -I$(srctree)/../common/inc/chip/myna2/A0
     B_CHIP_CFLAGS += -DGEN_3
     PLATFORM_CPPFLAGS += -DCONFIG_GENX_ENABLE
     PLATFORM_CPPFLAGS += -DLOGO_SRC_FMT=3
@@ -74,19 +71,38 @@ ifdef CONFIG_TARGET_MYNA2
     obj-y += lcdc/source/syna_lcdc_dlr.o
     obj-y += dhub/bcmbuf.o
     obj-y += dhub/hal_dhub.o
-    obj-y += dhub/myna2/avio_dhub_cfg.o
-    obj-y += vpp_ca/avpll/myna2/avpll.o
     obj-y += dsi/dsih_api.o
     obj-y += dsi/dsih_core.o
     obj-y += dsi/dsih_dphy.o
     obj-y += dsi/dsih_hal.o
     obj-y += dsi/dphy_wrap.o
     obj-y += dsi/dsih_displays.o
-    obj-y += vpp_ca/avpll/myna2/diag_pll.o
     obj-y += asxxx/lcdc_display.o
     obj-y += hal_vpp_ntz.o
     obj-$(CONFIG_SYNA_DRM_BRIDGE_LT9611) += bridge/lt9611.o
     obj-y += lcdc_pinmux.o
+endif
+
+ifdef CONFIG_TARGET_MYNA2
+    SOC_FOLDER := myna2
+    PLATFORM_CPPFLAGS += -I$(srctree)/../common/inc/chip/myna2/A0
+    PLATFORM_CPPFLAGS += -I$(srctree)/board/synaptics/myna2/include
+endif
+
+ifdef CONFIG_TARGET_KLAMATH
+    SOC_FOLDER := klamath
+endif
+
+ifneq ($(SOC_FOLDER),)
+    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/vpp_ca/avpll/$(SOC_FOLDER)/
+    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/lcdc/include/$(SOC_FOLDER)
+    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/lcdc/include
+    PLATFORM_CPPFLAGS += -I$(srctree)/arch/arm/mach-synaptics/drivers/video/dhub/$(SOC_FOLDER)/
+
+    obj-y += lcdc/source/$(SOC_FOLDER)/lcdc_cfg_prv.o
+    obj-y += dhub/$(SOC_FOLDER)/avio_dhub_cfg.o
+    obj-y += vpp_ca/avpll/$(SOC_FOLDER)/avpll.o
+    obj-y += vpp_ca/avpll/$(SOC_FOLDER)/diag_pll.o
 endif
 
 PLATFORM_CPPFLAGS += $(B_CHIP_CFLAGS)

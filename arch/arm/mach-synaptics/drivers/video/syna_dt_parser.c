@@ -91,6 +91,15 @@ static int syna_parse_lcdc_dt(struct udevice *dev)
 		return 0;
 	}
 
+	{
+		const char *panel_status = fdt_getprop(blob, offset, "status", NULL);
+
+		if (!panel_status || strcmp(panel_status, "okay") != 0) {
+			debug("lcdc_panel disabled, skipping TFT display init\n");
+			return 0;
+		}
+	}
+
 	pTimingInfo = &priv->lcdc_config_data->pTimingInfo[DISPLAY_TYPE_TFT];
 
 	READ_OF_NODE(pTimingInfo->hact, hact);

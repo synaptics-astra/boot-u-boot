@@ -444,3 +444,8 @@
 #define MEMMAP_CHIP_CTRL_REG_BASE START_CHIP_CTRL_REG
 #define Gbl_bootStrap_bootSrc_ROM_SPI_BOOT Gbl_bootStrap_bootSrc_ROM_BOOT_FROM_XSPI
 #define MEMMAP_CA7_REG_BASE START_ACPU_REG
+
+/* AVIO register base — alias of START_AVIO_REG (0xF7400000) */
+#ifndef MEMMAP_AVIO_REG_BASE
+#define MEMMAP_AVIO_REG_BASE START_AVIO_REG
+#endif

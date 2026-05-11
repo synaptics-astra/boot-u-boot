@@ -24,6 +24,17 @@
 
 #ifndef __AVIO_DHUB_CFG_PRV_H__
 #define __AVIO_DHUB_CFG_PRV_H__
+
+typedef enum DHUB_128bBCM_TYPE_s {
+	DHUB_128bBCM_TYPE_64b,
+	DHUB_128bBCM_TYPE_128b,
+} DHUB_128bBCM_TYPE;
+
+typedef enum _DHUB_TYPE_ {
+	DHUB_TYPE_64BIT,
+	DHUB_TYPE_128BIT,
+} DHUB_TYPE;
+
 #define AG_NUM_OF_CHANNELS            (avioDhubChMap_aio64b_DRT_W + 1)
 
 #define VPP_NUM_OF_CHANNELS           (avioDhubChMap_vpp128b_LCDC2_R + 1)
