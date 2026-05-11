@@ -55,10 +55,7 @@
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct udevice *backlight;
-
-#if defined(CONFIG_TARGET_MYNA2)
 static struct udevice *video_bridge;
-#endif
 
 static int dt_parse_status = -1; /* DT parsing status: 0=success, non-zero=failure */
 
@@ -216,15 +213,14 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 	if (!ret)
 		backlight_enable(backlight);
 
-#ifdef CONFIG_VIDEO_BRIDGE
-	ret = uclass_get_device(UCLASS_VIDEO_BRIDGE, 0, &video_bridge);
-	if (!ret) {
-		video_bridge_attach(video_bridge);
-#ifdef CONFIG_SYNA_DRM_BRIDGE_LT9611
-		lt9611_bridge_modeset(video_bridge, &priv->video_mode);
-#endif
+	if (IS_ENABLED(CONFIG_VIDEO_BRIDGE)) {
+		ret = uclass_get_device(UCLASS_VIDEO_BRIDGE, 0, &video_bridge);
+		if (!ret) {
+			video_bridge_attach(video_bridge);
+			if (IS_ENABLED(CONFIG_SYNA_DRM_BRIDGE_LT9611))
+				lt9611_bridge_modeset(video_bridge, &priv->video_mode);
+		}
 	}
-#endif
 
 	MV_VPP_Stop();
 
