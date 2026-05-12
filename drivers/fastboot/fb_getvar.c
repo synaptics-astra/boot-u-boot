@@ -321,6 +321,12 @@ void fastboot_getvar(char *cmd_parameter, char *response)
 			return;
 		}
 
+		s = env_get(cmd_parameter);
+		if (s) {
+			fastboot_response("OKAY", response, "%s", s);
+			return;
+		}
+
 		strsep(&var_parameter, ":");
 		for (i = 0; i < ARRAY_SIZE(getvar_dispatch); ++i) {
 			if (!strcmp(getvar_dispatch[i].variable,
