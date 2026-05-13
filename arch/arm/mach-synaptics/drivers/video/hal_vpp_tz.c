@@ -63,16 +63,16 @@ static void TZ_MV_GetHDMIPreferredRes(struct vpp_config_params *vpp_config_param
 		if (sinkCaps & ((1 << VPP_HDMI_SINKCAP_BITMASK_FULL4K) |
 				(1 << VPP_HDMI_SINKCAP_BITMASK_4K30))) {
 			vpp_config_param->disp1_res_id =
-				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_PREF50FPS)) ?
-				HDMI_MAX_RES_ENABLED_50_25 : HDMI_MAX_RES_ENABLED_60_30;
+				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_60FPS)) ?
+				HDMI_MAX_RES_ENABLED_60_30 : HDMI_MAX_RES_ENABLED_50_25;
 		} else if (sinkCaps & ((1 << VPP_HDMI_SINKCAP_BITMASK_FHD)))
 			vpp_config_param->disp1_res_id =
-				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_PREF50FPS)) ?
-				RES_1080P50 : RES_1080P60;
+				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_60FPS)) ?
+				RES_1080P60 : RES_1080P50;
 		else
 			vpp_config_param->disp1_res_id =
-				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_PREF50FPS)) ?
-				RES_720P50 : RES_720P60;
+				(sinkCaps & (1 << VPP_HDMI_SINKCAP_BITMASK_60FPS)) ?
+				RES_720P60 : RES_720P50;
 
 		debug("HDMI_HPD detected, setting res to resId:%d\n",
 		      vpp_config_param->disp1_res_id);
