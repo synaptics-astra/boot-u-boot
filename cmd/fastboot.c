@@ -103,6 +103,10 @@ static int do_fastboot_usb(int argc, char *const argv[],
 			break;
 		if (ctrlc())
 			break;
+		if (env_get_ulong("fb_exit", 10, 0) == 1) {
+			env_set("fb_exit", NULL);
+			break;
+		}
 		schedule();
 		dm_usb_gadget_handle_interrupts(udc);
 	}
