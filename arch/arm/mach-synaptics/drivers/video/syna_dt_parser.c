@@ -435,7 +435,7 @@ static struct driver *find_compat_driver(const char *target_compat)
 
 static int probe_new_regulators(void)
 {
-	ofnode i2c_node, regulator_node, parent_node;
+	ofnode i2c_node, regulator_node;
 	int index = 0, ret;
 	struct driver *drv;
 	struct udevice *dev;
@@ -451,26 +451,28 @@ static int probe_new_regulators(void)
 		debug("Invalid lcdc-pinmux path\n");
 	}
 
-	parent_node = ofnode_path("/soc/apb@f7e80000");
-
-	if (!ofnode_valid(parent_node)) {
-		printf("soc apb node not found\n");
-		return -EINVAL;
-	}
-
-	ofnode_for_each_subnode(i2c_node, parent_node) {
+	/*
+	 * Probe all DesignWare I2C controllers in the DT by compatible
+	 * string, regardless of their position in the bus hierarchy.
+	 *
+	 * This handles all current variants without hardcoding a parent path:
+	 * Dolphin / Myna2 / Platypus:  /soc/apb@f7e80000/i2c*
+	 * Klamath SM/SOC domain: /soc/sm/i2c[0-1] | /soc/i2c[2-3]
+	 */
+	for (i2c_node = ofnode_by_compatible(ofnode_null(), "snps,designware-i2c");
+	     ofnode_valid(i2c_node);
+	     i2c_node = ofnode_by_compatible(i2c_node, "snps,designware-i2c")) {
 		struct udevice *i2c_dev, *dev;
 
-		/* Look for only i2c node from this parent node */
-		if (!ofnode_device_is_compatible(i2c_node, "snps,designware-i2c"))
-			continue;
-
-		/* Find corresponding device for this i2c_node if available */
+		/* Find the probed I2C bus device for this node */
 		ret = uclass_get_device_by_ofnode(UCLASS_I2C, i2c_node, &i2c_dev);
-		if (ret)
+		if (ret) {
+			debug("i2c node %s not available (%d), skipping\n",
+			      ofnode_get_name(i2c_node), ret);
 			continue;
+		}
 
-		/* Walk through i2c child nodes and attempt to bind any regulator node */
+		/* Walk through i2c child nodes and attempt to bind any device node */
 		ofnode_for_each_subnode(regulator_node, i2c_node) {
 			if (!ofnode_valid(regulator_node))
 				continue;
@@ -480,45 +482,49 @@ static int probe_new_regulators(void)
 			if (!compat)
 				continue;
 
-			sprintf(regulator_dev_name, "regulator-dev%d", index);
 			drv = find_compat_driver(compat);
-			if (drv) {
-				/* Check if the device already bound*/
-				ret = device_get_global_by_ofnode(regulator_node, &dev);
-				if (!ret && !strcmp(dev->name, ofnode_get_name(regulator_node))) {
-					debug("Device already bound: %s\n", dev->name);
-					continue;
-				}
+			if (!drv)
+				continue;
 
-				ret = device_bind_driver_to_node(i2c_dev, drv->name,
-								 regulator_dev_name,
-								 regulator_node, &dev);
-				if (ret) {
-					printf("driver %s bind to [%s/%s] failed [%d]\n",
-					       drv->name, ofnode_get_name(i2c_node),
-					       ofnode_get_name(regulator_node), ret);
-					continue;
-				}
+			/* Check if the device is already bound */
+			ret = device_get_global_by_ofnode(regulator_node, &dev);
+			if (!ret && !strcmp(dev->name,
+					    ofnode_get_name(regulator_node))) {
+				debug("Device already bound: %s\n", dev->name);
+				continue;
+			}
 
-				debug("driver %s bound to [%s/%s] @[%s]\n",
-				      drv->name, ofnode_get_name(i2c_node),
-				      ofnode_get_name(regulator_node),
-				      regulator_dev_name);
-				/*Move index for next regulator binding*/
-				index++;
+			snprintf(regulator_dev_name, sizeof(regulator_dev_name),
+				 "regulator-dev%d", index);
 
-				if (dev) {
-					ret = device_probe(dev);
-					if (ret)
-						printf("device driver %s probe failed (%d)\n",
-						       drv->name, ret);
-					else
-						debug("device driver %s probe success!\n",
-						      drv->name);
-				}
+			ret = device_bind_driver_to_node(i2c_dev, drv->name,
+							 regulator_dev_name,
+							 regulator_node, &dev);
+			if (ret) {
+				printf("driver %s bind to [%s/%s] failed [%d]\n",
+				       drv->name, ofnode_get_name(i2c_node),
+				       ofnode_get_name(regulator_node), ret);
+				continue;
+			}
+
+			debug("driver %s bound to [%s/%s] @[%s]\n",
+			      drv->name, ofnode_get_name(i2c_node),
+			      ofnode_get_name(regulator_node),
+			      regulator_dev_name);
+			/* Advance index for the next binding slot */
+			index++;
+
+			if (dev) {
+				ret = device_probe(dev);
+				if (ret)
+					printf("device driver %s probe failed (%d)\n",
+					       drv->name, ret);
+				else
+					debug("device driver %s probe success!\n",
+					      drv->name);
 			}
 		} /* i2c child nodes loop */
-	} /* i2c parent loop */
+	} /* i2c bus loop */
 	return 0;
 }
 
