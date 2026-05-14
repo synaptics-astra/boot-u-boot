@@ -40,11 +40,11 @@
 #include <memalign.h>
 #include <u-boot/crc.h>
 #include "linux/kconfig.h"
+#include "misc_syna.h"
 #include "spinand_drv.h"
 #include "../include/getopt.h"
 
 #define UNUSED(var) ((void)(var))
-#define MAX_NANDIMG_SIZE	0x18000000
 #define NAND_BOOT_PARTITION_SIZE 0x80000
 #define MAX_BLK_SIZE 0x100000
 
@@ -292,6 +292,7 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	u32 fpos;
 	u32 src = 0;
 	struct mtd_info *mtd;
+	u64 max_alloc;
 
 	char img_name[512];
 	u32 align_size = 0;
@@ -351,9 +352,12 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		mimg = 1;//image must be loaded to address argv[optind]
 
 	if (mimg == 0) {
-		var = malloc(MAX_NANDIMG_SIZE);
-		if (!var)
-			return CMD_RET_USAGE;
+		max_alloc = get_max_malloc_size();
+		var = malloc(max_alloc);
+		if (!var) {
+			printf("malloc failed\n");
+			goto ERROR;
+		}
 		mem_addr = (u32)(u64)var;
 		nimg_hdr = (struct img_hdr_t *)(u64)mem_addr;
 	}
@@ -378,7 +382,7 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	mtd = xspi_nand_init();
 	if (!mtd) {
 		printf("%s xspi nand init failed\n", __func__);
-		return -1;
+		goto ERROR;
 	}
 
 	mtd->_read = NULL;
@@ -406,7 +410,7 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		ret = detect_randomized_blks(XSPI_WRITE, (uintptr_t)nimg_hdr);
 		if (ret) {
 			printf("detect_randomized_blks failed\n");
-			return -1;
+			goto ERROR;
 		}
 	}
 
@@ -459,7 +463,7 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 			ret = mtd_erase(mtd, &erase_op);
 			if (ret) {
 				printf("Erase failed at 0x%x\n", erase_offset);
-				return ret;
+				goto ERROR;
 			}
 		}
 
