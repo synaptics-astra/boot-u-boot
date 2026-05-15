@@ -123,6 +123,12 @@
 		clk_freq = <250000000>;
 	};
 
+	apbcoreclk: apbcoreclk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <100000000>;
+	};
+
 	pmu {
 		compatible = "arm,cortex-a55-pmu";
 		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>,
@@ -438,6 +444,34 @@
 				#interrupt-cells = <2>;
 				interrupts = <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>;
 			};
+		};
+
+/**************************************************************************************
+ * Put all new nodes before this line - DTBO overlay feature updates below entries
+ **************************************************************************************
+ */
+		i2c2: i2c@f7f05000 {
+			compatible = "snps,designware-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xf7f05000 0x100>;
+			clocks = <&apbcoreclk>;
+			i2c-sda-hold-time-ns = <449>;
+			i2c-sda-falling-time-ns = <425>;
+			i2c-scl-falling-time-ns = <205>;
+			status = "disabled";
+		};
+
+		i2c3: i2c@f7f06000 {
+			compatible = "snps,designware-i2c";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xf7f06000 0x100>;
+			clocks = <&apbcoreclk>;
+			i2c-sda-hold-time-ns = <449>;
+			i2c-sda-falling-time-ns = <425>;
+			i2c-scl-falling-time-ns = <205>;
+			status = "disabled";
 		};
 
 		drm: drm {

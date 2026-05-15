@@ -85,6 +85,11 @@
 				 "GPIO58", "GPIO59";
 		function = "rgmii2";
 	};
+
+	i2c2_pmux: i2c2-pmux {
+		groups = "GPIO23", "GPIO24";
+		function = "tw2";
+	};
 };
 
 &sysmgr_pinctrl {
@@ -137,6 +142,13 @@
 		enable-gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
 		reset-gpio = <&expander0 7 GPIO_ACTIVE_LOW>;
 	};
+};
+
+&i2c2 {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&i2c2_pmux>;
+	clock-frequency = <100000>;
 };
 
 &sm_uart0 {
