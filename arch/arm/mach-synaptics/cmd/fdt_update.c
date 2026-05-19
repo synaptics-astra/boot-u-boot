@@ -68,6 +68,7 @@ enum {
 	FDT_UPDATE_OPP = BIT(2),
 	FDT_UPDATE_MAC = BIT(3),
 	FDT_UPDATE_OVERLAY = BIT(4),
+	FDT_UPDATE_CMA = BIT(5),
 };
 
 /* Add/Append various video related kernel command line params */
@@ -610,6 +611,33 @@ static int setup_mac(void *fdt)
 
 }
 
+static int setup_cma(void *fdt)
+{
+	int offset;
+	u64 cma_base, cma_size;
+	u32 reg_value[4];
+
+	/* only for Klamath now */
+	if (!IS_ENABLED(CONFIG_TARGET_KLAMATH))
+		return 0;
+
+	offset = fdt_path_offset(fdt, "/reserved-memory/linux,cma");
+	if (offset < 0) {
+		debug("didn't find point of /reserved-memory/linux,cma\n");
+		return -1;
+	}
+
+	cma_base = get_cma_addr();
+	cma_size = get_cma_size();
+
+	reg_value[0] = cpu_to_fdt32(cma_base >> 32);
+	reg_value[1] = cpu_to_fdt32(cma_base & 0xFFFFFFFF);
+	reg_value[2] = cpu_to_fdt32(cma_size >> 32);
+	reg_value[3] = cpu_to_fdt32(cma_size & 0xFFFFFFFF);
+
+	return fdt_setprop(fdt, offset, "reg", reg_value, sizeof(reg_value));
+}
+
 #ifdef CONFIG_OF_LIBFDT_OVERLAY
 static int setup_fdt_overlay(void *fdt)
 {
@@ -706,6 +734,9 @@ int fdt_update(struct fdt_header *fdt)
 	if (!(skip & FDT_UPDATE_OVERLAY))
 		setup_fdt_overlay(fdt);
 #endif
+
+	if (!(skip & FDT_UPDATE_CMA))
+		setup_cma(fdt);
 
 	fdt_pack(fdt);
 
