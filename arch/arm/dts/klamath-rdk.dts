@@ -134,14 +134,6 @@
 		gpio-controller;
 		#gpio-cells = <2>;
 	};
-
-	dsi_bridge: lt9611@3b {
-		compatible = "syna-bridge,lt9611";
-		reg = <0x3b>;
-		status = "okay";
-		enable-gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
-		reset-gpio = <&expander0 7 GPIO_ACTIVE_LOW>;
-	};
 };
 
 &i2c2 {
