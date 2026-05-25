@@ -326,6 +326,7 @@ static struct syna_lcdc_dev *syna_lcdc_create(int num, SYNA_LCDC_PANEL *panel)
 	if (!dev)
 		return NULL;
 
+	memset(dev, 0, sizeof(struct syna_lcdc_dev));
 	dev->core_addr = SYNA_LCDC_GET_BASE_ADDRESS(num);
 
 	dev->panel = panel;
