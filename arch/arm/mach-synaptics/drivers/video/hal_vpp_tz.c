@@ -99,7 +99,7 @@ static void TZ_MV_ValidateAndUpdateResolution(struct vpp_config_params *vpp_conf
 	int req_uhd_res = 0, req_fhd_res = 0, req_hd_res = 0;
 	int is_sink_uhd = 0, is_sink_fhd = 0;
 	int max_sink_res_id;
-	struct vpp_config_params temp_vpp_config_param;
+	struct vpp_config_params temp_vpp_config_param = *vpp_config_param;
 
 	/* If we are not able to read from sink, then fall back to dts default resolution */
 	TZ_MV_GetHDMIPreferredRes(&temp_vpp_config_param);
