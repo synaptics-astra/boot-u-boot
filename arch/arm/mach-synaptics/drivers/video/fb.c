@@ -52,6 +52,9 @@
 #include <fs.h>
 #include <cpu_func.h>
 
+#define RESET_ON_DELAY_US	10
+#define RESET_OFF_DELAY_US	10
+
 DECLARE_GLOBAL_DATA_PTR;
 
 static struct udevice *backlight;
@@ -193,6 +196,13 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 		return dt_parse_status;
 	}
 
+	if (dm_gpio_is_valid(&priv->rst_gpio)) {
+		dm_gpio_set_value(&priv->rst_gpio, 1);
+		udelay(RESET_ON_DELAY_US);
+		dm_gpio_set_value(&priv->rst_gpio, 0);
+		udelay(RESET_OFF_DELAY_US);
+	}
+
 	p_res_cfg = priv->vpp_config_param.mipi_resinfo_params;
 	if (p_res_cfg && p_res_cfg->vppMipiCmd.pcmd) {
 		cmd_header = (VPP_MIPI_CMD_HEADER *)((u8 *)p_res_cfg->vppMipiCmd.pcmd +
@@ -227,6 +237,9 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 	ret = uclass_get_device(UCLASS_PANEL_BACKLIGHT, 0, &backlight);
 	if (!ret)
 		backlight_enable(backlight);
+
+	if (dm_gpio_is_valid(&priv->bl_gpio))
+		dm_gpio_set_value(&priv->bl_gpio, 1);
 
 	if (IS_ENABLED(CONFIG_VIDEO_BRIDGE)) {
 		ofnode bridge_ofnode = ofnode_path("/soc/drm/dsi_hdmi_lt9611_bridge");

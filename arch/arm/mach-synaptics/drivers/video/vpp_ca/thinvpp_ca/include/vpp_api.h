@@ -2358,6 +2358,8 @@ struct berlin_fb_priv {
 	struct vpp_config_params vpp_config_param;
 	struct lcdc_config *lcdc_config_data;
 	struct gpio_desc enable;
+	struct gpio_desc bl_gpio;
+	struct gpio_desc rst_gpio;
 	struct ctfb_res_modes video_mode;
 };
 

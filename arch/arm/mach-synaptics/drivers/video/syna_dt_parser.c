@@ -137,6 +137,16 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 	struct ctfb_res_modes *video_mode = &priv->video_mode;
 	VPP_MIPI_CMD_HEADER *hdr;
 
+	ofnode panel_node = ofnode_path(DSI_PANEL_DTS_PATH);
+
+	if (gpio_request_by_name_nodev(panel_node, "mipirst-gpio", 0,
+				       &priv->rst_gpio, GPIOD_IS_OUT))
+		debug("Reset GPIO parsing failed\n");
+
+	if (gpio_request_by_name_nodev(panel_node, "mipibl-gpio", 0,
+				       &priv->bl_gpio, GPIOD_IS_OUT))
+		debug("Backlight GPIO parsing failed\n");
+
 	ret = fdt_node_offset_by_compatible(blob, -1, "syna,mipi-dsi");
 	if (ret < 0) {
 		debug("mipi-dsi node not found\n");
