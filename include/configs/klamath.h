@@ -26,7 +26,52 @@
 #define GICD_BASE       0xf7e59000
 #define GICC_BASE       0xf7e5a000
 
+#ifdef CONFIG_SYNA_RESCUE_MODE
+#ifdef CONFIG_CMD_SYNA_SPINAND_BURNING
+#define CFG_EXTRA_ENV_SETTINGS \
+	"usb_pgood_delay=3000\0" \
+	"upgrade_available=0\0" \
+	"rescue_load=ubi part rescue; "\
+		"ubifsmount ubi0:rescue; "\
+		"ubifsload 0x10000000 Image.gz; "\
+		"ubifsload 0x17c00000 board.dtb; "\
+		"ubifsload 0x12000000 initramfs.rootfs.cpio.gz\0" \
+	"rescue_setup=setenv ramdisk_size $filesize; "\
+		"setenv kernel_comp_addr_r 0x7c00000; "\
+		"setenv kernel_comp_size 0x4000000; "\
+		"setenv bootm_low 0x0; "\
+		"setenv bootm_size 0x10000000; "\
+		"setenv bootargs shell earlycon console=ttyS0,115200 "\
+		"ro rootfstype=ubifs ubi.mtd=rootfs root=/dev/ubi0_0 rootwait; "\
+		"setenv initrd_high\0" \
+	"rescue_exec=booti 0x10000000 0x12000000:${ramdisk_size} 0x17c00000\0" \
+	"rescue_boot=echo \"*** RESCUE MODE TRIGGERED ***\"; "\
+		"setenv initrd_high; run rescue_load; run rescue_setup; run rescue_exec\0"
+#elif defined CONFIG_CMD_SYNA_BOOTMMC
+#define CFG_EXTRA_ENV_SETTINGS \
+	"usb_pgood_delay=3000\0" \
+	"upgrade_available=0\0" \
+	"rescue_load=ext4load mmc 0:2 0x10000000 Image.gz; "\
+		"ext4load mmc 0:2 0x17c00000 board.dtb; "\
+		"ext4load mmc 0:2 0x12000000 initramfs.rootfs.cpio.gz\0" \
+	"rescue_setup=setenv ramdisk_size $filesize; "\
+		"setenv kernel_comp_addr_r 0x7c00000; "\
+		"setenv kernel_comp_size 0x4000000; "\
+		"setenv bootm_low 0x0; "\
+		"setenv bootm_size 0x10000000; "\
+		"setenv bootargs shell earlycon console=ttyS0,115200 "\
+		"rootwait rootfstype=ext4; "\
+		"setenv initrd_high\0" \
+	"rescue_exec=booti 0x10000000 0x12000000:${ramdisk_size} 0x17c00000\0" \
+	"rescue_boot=echo \"*** RESCUE MODE TRIGGERED ***\"; "\
+		"setenv initrd_high; run rescue_load; run rescue_setup; run rescue_exec\0"
+#else
+#define CFG_EXTRA_ENV_SETTINGS \
+	"rescue_boot=echo \"*** RESCUE MODE UNSUPPORTED ***\0"
+#endif
+#else
 #define CFG_EXTRA_ENV_SETTINGS \
 	"usb_pgood_delay=3000\0" \
 	"upgrade_available=0\0" \
 	"altbootcmd=if test ${boot_slot} = 1; then bootslot set b; bootcount reset;bootcount reset; run bootcmd; else bootslot set a; bootcount reset; bootcount reset; run bootcmd; fi\0"
+#endif

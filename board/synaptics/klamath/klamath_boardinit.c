@@ -29,6 +29,16 @@
 #include "mcu_gbl_cfg.h"
 #include <linux/delay.h>
 
+// Check GPIO30/PortA30
+// GPIO group gpio@44_ not existed for nand, so 78 for nand and 86 for emmc
+#if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
+#if (IS_ENABLED(CONFIG_CMD_SYNA_SPINAND_BURNING))
+#define GPIO_RESCUE_DETECT  78
+#else
+#define GPIO_RESCUE_DETECT  86
+#endif
+#endif
+
 static void init_clock(void)
 {
 	writel(0X00000008, 0XF7E10400);
@@ -283,6 +293,27 @@ static void init_sdio2_lpclk(void)
 	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl);
 }
 
+#if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
+static void setup_rescue_mode_gpio(void)
+{
+	gpio_request(GPIO_RESCUE_DETECT, "DETECT");
+	gpio_direction_input(GPIO_RESCUE_DETECT);
+}
+
+static void rescue_trigger_detect(void)
+{
+	// Clear detect pin to 1 briefly before reading input
+	gpio_direction_output(GPIO_RESCUE_DETECT, 1);
+	udelay(10);
+	gpio_direction_input(GPIO_RESCUE_DETECT);
+
+	if (gpio_get_value(GPIO_RESCUE_DETECT) == 0) {
+		// Boot Rescue Image
+		run_command("run rescue_boot", 0);
+	}
+}
+#endif
+
 int board_init(void)
 {
 	/* board related things like clock may be inited here */
@@ -299,6 +330,11 @@ int board_init(void)
 int board_late_init(void)
 {
 	unsigned int result = 0;
+
+#if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
+	setup_rescue_mode_gpio();
+	rescue_trigger_detect();
+#endif
 
 #ifdef CONFIG_SYNA_TZ_MR
 	get_mem_region_list_from_tz();
