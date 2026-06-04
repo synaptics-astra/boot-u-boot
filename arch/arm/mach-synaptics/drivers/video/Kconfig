@@ -27,6 +27,13 @@ config SYNA_WSPANEL_1080P
 	  Enable this option to the syna compatible waveshare 13.3 inch panel with
 	  1080p resolution
 
+config SYNA_WSPANEL_10P1
+    bool "10.1-inch Waveshare DSI panel"
+    help
+      Enable support for the 10.1-inch Waveshare DSI display panel.
+      This driver initializes the display controller and touchscreen
+      interface used on the Waveshare 10.1-inch panel.
+
 config DEFAULT_PANEL_DTBO
 	string "Panel default dtbo file"
 	depends on VIDEO_SYNA
