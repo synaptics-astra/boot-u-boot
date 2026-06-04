@@ -24,6 +24,7 @@
 
 #include <asm/io.h>
 #include <linux/types.h>
+#include <vsprintf.h>
 #include <malloc.h>
 #include "mem_init.h"
 #include "SysMgr.h"
@@ -163,6 +164,7 @@ int syna_init_sm(void)
 
 	if (syna_load_sm()) {
 		printf("ERROR: Failed to load SM firmware\n");
+		panic("\nPANIC: SM INIT FAILURE");
 		return -1;
 	}
 
