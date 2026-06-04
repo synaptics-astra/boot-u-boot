@@ -576,7 +576,7 @@ static int dl_and_burn_img(char *src, char *path, char *imgname, char *pt)
 	if (!buff)
 		return -ENOMEM;
 
-	sprintf(cmd, "imgload %s %s%s 0x%p", src ? src : "", path, imgname, buff);
+	snprintf(cmd, sizeof(cmd), "imgload %s %s%s 0x%p", src ? src : "", path, imgname, buff);
 
 	printf("allocated memory address 0x%p\n", buff);
 	ret = run_command(cmd, 0);
@@ -889,7 +889,7 @@ static int get_part_name_from_img_name(char *src, char *partlst, char *imgname)
 		return -ENOMEM;
 
 	memset(buff, 0, 0x1000);
-	sprintf(cmd, "imgload %s %s 0x%p", src, partlst, buff);
+	snprintf(cmd, sizeof(cmd), "imgload %s %s 0x%p", src, partlst, buff);
 
 	ret = run_command(cmd, 0);
 	if (ret) {
@@ -985,7 +985,7 @@ static int pt_operation_serialization(char *src, char *imglst, struct pt_operati
 		return -ENOMEM;
 
 	memset(buff, 0, 0x1000);
-	sprintf(cmd, "imgload %s %s 0x%p", src, imglst, buff);
+	snprintf(cmd, sizeof(cmd), "imgload %s %s 0x%p", src, imglst, buff);
 
 	ret = run_command(cmd, 0);
 	if (ret) {
@@ -1098,7 +1098,7 @@ static int do_emmc_part(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 		goto ERROR;
 
 	memset(buff, 0, 0x1000);
-	sprintf(cmd, "imgload %s %s 0x%p", src, imgname, buff);
+	snprintf(cmd, sizeof(cmd), "imgload %s %s 0x%p", src, imgname, buff);
 
 	ret = run_command(cmd, 0);
 	if (ret) {
@@ -1321,16 +1321,16 @@ static int do_list2emmc(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 #endif
 
 	if ((argc - optind) == 1) {
-		sprintf(part_file, "%s/emmc_part_list", argv[optind]);
-		sprintf(img_list, "%s/emmc_image_list", argv[optind]);
+		snprintf(part_file, sizeof(part_file), "%s/emmc_part_list", argv[optind]);
+		snprintf(img_list, sizeof(img_list), "%s/emmc_image_list", argv[optind]);
 	}
 	if ((argc - optind) == 2) {
-		sprintf(part_file, "%s", argv[optind]);
-		sprintf(img_list, "%s", argv[optind + 1]);
+		snprintf(part_file, sizeof(part_file), "%s", argv[optind]);
+		snprintf(img_list, sizeof(img_list), "%s", argv[optind + 1]);
 	}
 
 	//parse part and gen gpt
-	sprintf(cmd, "emmcpart import %s %s", srcstr[src], part_file);
+	snprintf(cmd, sizeof(cmd), "emmcpart import %s %s", srcstr[src], part_file);
 	ret = run_command(cmd, 0);
 	if (ret) {
 		printf("import part_list fail\n");
@@ -1347,10 +1347,10 @@ static int do_list2emmc(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 
 	//parse image list and burn image
 	if (develop_mode)
-		sprintf(cmd, "img2sd import %s %s %s",
-			srcstr[src], img_list, ignore_partition_list ? ignore_partition_list : "");
+		snprintf(cmd, sizeof(cmd), "img2sd import %s %s %s", srcstr[src],
+			 img_list, ignore_partition_list ? ignore_partition_list : "");
 	else
-		sprintf(cmd, "img2sd import %s %s", srcstr[src], img_list);
+		snprintf(cmd, sizeof(cmd), "img2sd import %s %s", srcstr[src], img_list);
 	ret = run_command(cmd, 0);
 	if (ret)
 		goto ERROR;

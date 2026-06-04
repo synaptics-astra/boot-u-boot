@@ -397,7 +397,8 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	loff_t chip_size;
 
 	if (mimg == 0) {
-		sprintf(cmd, "imgload %s %s 0x%p", srcstr[src], img_file, (void *)(u64)mem_addr);
+		snprintf(cmd, sizeof(cmd), "imgload %s %s 0x%p", srcstr[src],
+			 img_file, (void *)(u64)mem_addr);
 		ret = run_command(cmd, 0);
 	}
 

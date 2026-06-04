@@ -118,8 +118,8 @@ static int load_and_apply_dtbo(const char *dtbo_name, char *path,
 	}
 
 	/* Load DTBO from storage */
-	sprintf(cmd, "ext4load mmc %s %p %s/%s",
-		mmc_part, fdto_addr, path, dtbo_name);
+	snprintf(cmd, sizeof(cmd), "ext4load mmc %s %p %s/%s",
+		 mmc_part, fdto_addr, path, dtbo_name);
 
 	ret = run_command(cmd, 0);
 	if (ret) {
@@ -271,7 +271,7 @@ static int is_file_exists(const char *dtbo_env, char *path, char *mmc_part)
 		return -ENODEV;
 	}
 
-	sprintf(filename, "%s/%s", path, dtbo_env);
+	snprintf(filename, sizeof(filename), "%s/%s", path, dtbo_env);
 
 	/* Returns 1 if present, 0 if not */
 	return fs_exists(filename) ? 0 : -ENOENT;

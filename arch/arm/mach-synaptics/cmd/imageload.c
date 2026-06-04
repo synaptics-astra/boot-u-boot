@@ -39,7 +39,7 @@ static int get_img_usbslave(char * const img_name, void *addr)
 	int image_size = 0;
 	char cmd[512];
 
-	sprintf(cmd, "usbload %s 0x%x", img_name, (uint32_t)(uint64_t)addr);
+	snprintf(cmd, sizeof(cmd), "usbload %s 0x%x", img_name, (uint32_t)(uint64_t)addr);
 	printf("%s\n", cmd);
 
 	ret = run_command(cmd, 0);
@@ -74,7 +74,8 @@ static int get_img_usbhost(char * const img_name, void *addr)
 	colon_ptr = strchr(p_img_name, ':');
 
 	if (!colon_ptr) {
-		sprintf(cmd, "fatload usb 0 0x%x %s", (uint32_t)(uint64_t)addr, img_name);
+		snprintf(cmd, sizeof(cmd), "fatload usb 0 0x%x %s",
+			 (uint32_t)(uint64_t)addr, img_name);
 	} else {
 		for (i = 0, p_img_name = img_name; i < 16; i++, p_img_name++) {
 			if (*p_img_name == ':')
@@ -86,8 +87,8 @@ static int get_img_usbhost(char * const img_name, void *addr)
 			}
 			usbpath[i] = *p_img_name;
 		}
-		sprintf(cmd, "fatload usb %s 0x%x %s",
-			usbpath, (uint32_t)(uint64_t)addr, p_img_name);
+		snprintf(cmd, sizeof(cmd), "fatload usb %s 0x%x %s", usbpath,
+			 (uint32_t)(uint64_t)addr, p_img_name);
 	}
 	printf("%s\n", cmd);
 
@@ -129,12 +130,12 @@ static int get_img_tftp(char * const img_name, void *addr)
 			}
 			serverip[i] = *p_img_name;
 		}
-		sprintf(cmd, "set serverip %s\n", serverip);
+		snprintf(cmd, sizeof(cmd), "set serverip %s\n", serverip);
 		//set serverip to env
 		run_command(cmd, 0);
 	}
 
-	sprintf(cmd, "tftpboot 0x%x %s", (uint32_t)(uint64_t)addr, img_name);
+	snprintf(cmd, sizeof(cmd), "tftpboot 0x%x %s", (uint32_t)(uint64_t)addr, img_name);
 
 	ret = run_command(cmd, 0);
 	if (ret)
@@ -168,7 +169,8 @@ static int get_img_sd(char * const img_name, void *addr)
 	colon_ptr = strchr(p_img_name, ':');
 
 	if (!colon_ptr) {
-		sprintf(cmd, "fatload mmc 1 0x%x %s", (uint32_t)(uint64_t)addr, img_name);
+		snprintf(cmd, sizeof(cmd), "fatload mmc 1 0x%x %s",
+			 (uint32_t)(uint64_t)addr, img_name);
 	} else {
 		for (i = 0, p_img_name = img_name; i < 16; i++, p_img_name++) {
 			if (*p_img_name == ':')
@@ -180,8 +182,8 @@ static int get_img_sd(char * const img_name, void *addr)
 			}
 			sdpath[i] = *p_img_name;
 		}
-		sprintf(cmd, "fatload mmc %s 0x%x %s",
-			sdpath, (uint32_t)(uint64_t)addr, p_img_name);
+		snprintf(cmd, sizeof(cmd), "fatload mmc %s 0x%x %s", sdpath,
+			 (uint32_t)(uint64_t)addr, p_img_name);
 	}
 	printf("%s\n", cmd);
 

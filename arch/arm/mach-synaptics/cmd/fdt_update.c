@@ -689,8 +689,8 @@ static int setup_fdt_overlay(void *fdt)
 	}
 
 	while (tok) {
-		sprintf(cmd, "ext4load mmc %x:%x %p /boot/%s", get_mmc_active_dev(), part_index,
-			fdto_addr, tok);
+		snprintf(cmd, sizeof(cmd), "ext4load mmc %x:%x %p /boot/%s",
+			 get_mmc_active_dev(), part_index, fdto_addr, tok);
 		if (run_command(cmd, 0)) {
 			printf("failed to load '%s'\n", tok);
 			break;
