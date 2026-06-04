@@ -277,6 +277,9 @@ int syna_load_logo_info(int width, int height,
 
 	img_hdr = (void *)(img_buff + PREPEND_IMAGE_INFO_SIZE);
 
+	flush_dcache_range((unsigned long)img_buff,
+			   (unsigned long)(img_buff + read_size));
+
 	/* verify image */
 	ret = tee_verify_image(5, (void *)img_hdr, img_size,
 			       (void *)img_hdr, img_size, IMAGE_TYPE_FAST_LOGO);
@@ -288,6 +291,9 @@ int syna_load_logo_info(int width, int height,
 		//reset return value
 		ret = 0;
 	}
+
+	invalidate_dcache_range((unsigned long)img_buff,
+				(unsigned long)(img_buff + read_size));
 
 	header = img_buff + IMAGE_HEADER_FASTLOGO_SIZE;
 	fl_header = check_validate_logo(width, height, header);
@@ -303,7 +309,6 @@ int syna_load_logo_info(int width, int height,
 	logo_buffer = fl_header->offset + header;
 	logo_size = (fl_header->stride * fl_header->height) + pad_size;
 	read_buffer = (u8 *)malloc_ion_cacheable(logo_size);
-	flush_dcache_range((unsigned long)img_buff, (unsigned long)(img_buff + read_size));
 	memcpy(read_buffer, logo_buffer, logo_size);
 
 	g_logo_info[g_logo_info_cnt].addr = (unsigned long)read_buffer;
