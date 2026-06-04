@@ -643,13 +643,23 @@ static int setup_fdt_overlay(void *fdt)
 {
 	void *fdto_addr = NULL;
 	char cmd[512];
-	char *s, *tok, *copy = NULL;
+	char *s, *p, *tok, *copy = NULL;
 	int part_index, ret = 0;
 
 	s = env_get("dtbo");
-	if (!s) {
+	if (!s || !*s) {
 		debug("no dtbo found, exit fdt overlay!\n");
 		return -ENOENT;
+	}
+
+	p = s;
+	while (*p) {
+		if (!isalnum((unsigned char)*p) &&
+		    *p != '.' &&
+			*p != '_' &&
+			*p != '-')
+			return -EINVAL;
+	    p++;
 	}
 
 	copy = malloc(strlen(s) + 1);

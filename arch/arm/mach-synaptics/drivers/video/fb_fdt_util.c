@@ -22,6 +22,7 @@
  * TO ANY PARTY SHALL NOT EXCEED ONE HUNDRED U.S. DOLLARS.
  */
 #include <linux/types.h>
+#include <linux/ctype.h>
 #include <dm.h>
 #include <fdtdec.h>
 #include <libfdt.h>
@@ -102,6 +103,19 @@ static int load_and_apply_dtbo(const char *dtbo_name, char *path,
 {
 	char cmd[MAX_BUF_SIZE];
 	int ret;
+	const char *p = dtbo_name;
+
+	if (!dtbo_name || !*dtbo_name)
+		return -EINVAL;
+
+	while (*p) {
+		if (!isalnum((unsigned char)*p) &&
+		    *p != '.' &&
+			*p != '_' &&
+			*p != '-')
+			return -EINVAL;
+	    p++;
+	}
 
 	/* Load DTBO from storage */
 	sprintf(cmd, "ext4load mmc %s %p %s/%s",
