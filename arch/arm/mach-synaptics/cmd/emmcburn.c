@@ -652,7 +652,8 @@ static int set_bootbus(void)
 	/* always set default boot part to boot partition 1 with ack enabled */
 #if defined(CONFIG_TARGET_DOLPHIN) || \
 	defined(CONFIG_TARGET_PLATYPUS) || \
-	defined(CONFIG_TARGET_MYNA2)
+	defined(CONFIG_TARGET_MYNA2) || \
+	defined(CONFIG_TARGET_KLAMATH)
 	// FIXME: on dolphin and platypus, we have to set the ack bit to 0
 	ack = 0;
 #endif
