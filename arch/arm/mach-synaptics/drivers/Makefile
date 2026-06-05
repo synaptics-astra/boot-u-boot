@@ -34,7 +34,6 @@ obj-y += plat/	\
 	spi/		\
 	xspi/		\
 	clk/		\
-	tee/		\
 	pwm/		\
 	regulator/	\
 	usbconsole/	\
