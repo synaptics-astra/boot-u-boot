@@ -84,7 +84,13 @@ INT MV_VPPOBJ_Init(VPP_INIT_PARM *vpp_init_parm)
 
 	//Pass the vpp/vpp_rsv region to TA for its exclusive use
 	if (!VPP_GET_RSV_MEM_REGION(&start, &size)) {
+		if (size < SHM_SHARE_SZ) {
+			printf("vpp: rsv region too small: 0x%llx < 0x%x\n",
+			       (unsigned long long)size, SHM_SHARE_SZ);
+			return MV_VPP_ENOMEM;
+		}
 		vpp_init_parm->uiShmPA = (UINT32)start;
+		/* Allocate only required space - SHM_SHARE_SZ */
 		vpp_init_parm->uiShmSize = SHM_SHARE_SZ;
 	} else {
 		//vpp/vpp_rsv carveout does not exist, Then allocate from other carve-out
