@@ -250,7 +250,8 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 
 	if (!p_res_cfg->vppMipiCmd.bufsize) {
 		debug("[FB_DEBUG] Invalid MIPI commands\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
 	/* Allocate command buffer */
@@ -258,7 +259,8 @@ static int syna_parse_vpp_dsi_dt(struct udevice *dev)
 				   VPP_ALLOC_ALLIGNED(total_bufsize, PAGE_SIZE);
 	if (!p_res_cfg->vppMipiCmd.pcmd) {
 		printf("vppMipiCmd memory failed\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto out;
 	}
 
 	memset(p_res_cfg->vppMipiCmd.pcmd, 0, total_bufsize);
