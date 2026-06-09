@@ -91,7 +91,7 @@ int parse_version_table(u8 *buff)
 		vt->num_entries * sizeof(struct ver_table_entry_t);
 
 	/* check calculated version table size*/
-	if (vt_size >= 2048) {
+	if (vt_size >= 2048 || vt->num_entries > MAX_VERSION_TABLE) {
 		debug("ERROR: vt_size is too big %d!!!\n", vt_size);
 		return -2;
 	}
@@ -170,46 +170,80 @@ out:
 	return ret;
 }
 
-static int get_mtd_parts(struct mtd_info *mtd)
+static int valid_part_name(const char *name, int *name_len)
 {
-	char cmd[CMD_MTD_PARTS_LEN];
-	char part[64];
-	u32 left = CMD_MTD_PARTS_LEN;
-	u32 len = 0;
-	u32 size;
-	struct ver_table_entry_t *vte;
 	int i;
 
-	len = snprintf(cmd, left, "setenv mtdparts %s:", mtd->name);
-	if (len < 0)
+	if (!name || !name_len)
+		return 0;
+
+	for (i = 0; i < PART_NAME_MAX_LEN + 1; i++) {
+		unsigned char c = name[i];
+
+		if (c == '\0') {
+			if (i == 0)
+				return 0;
+
+			*name_len = i;
+			return 1;
+		}
+
+		if (!((c >= '0' && c <= '9') ||
+		      (c >= 'a' && c <= 'z') ||
+		      (c >= 'A' && c <= 'Z') ||
+		      c == '_' || c == '-'))
+			return 0;
+	}
+
+	return 0;
+}
+
+static int get_mtd_parts(struct mtd_info *mtd)
+{
+	char mtdparts[CMD_MTD_PARTS_LEN];
+	u32 left = CMD_MTD_PARTS_LEN;
+	u32 len = 0;
+	u64 size;
+	struct ver_table_entry_t *vte;
+	int i;
+	int name_len;
+	int ret;
+
+	ret = snprintf(mtdparts, left, "%s:", mtd->name);
+	if (ret < 0 || ret >= left)
 		return -1;
-	left -= len;
+
+	len += ret;
+	left -= ret;
 
 	for (i = 0; i < vts.num; i++) {
 		vte = &vts.vt[i];
-		size = vte->part1_blks * mtd->erasesize;
 
-		if (size >= GB && (size % GB == 0))
-			len = snprintf(part, MTD_PART_LEN, "%dg(%s),", size / GB, vte->name);
-		else if (size >= MB && (size % MB == 0))
-			len = snprintf(part, MTD_PART_LEN, "%dm(%s),", size / MB, vte->name);
-		else if (size >= KB && (size % KB == 0))
-			len = snprintf(part, MTD_PART_LEN, "%dk(%s),", size / KB, vte->name);
+		if (!valid_part_name(vte->name, &name_len))
+			return -1;
+
+		size = (u64)vte->part1_blks * mtd->erasesize;
+
+		if (size >= GB && size % GB == 0)
+			ret = snprintf(mtdparts + len, left, "%lluG(%.*s),",
+				       size / GB, name_len, vte->name);
+		else if (size >= MB && size % MB == 0)
+			ret = snprintf(mtdparts + len, left, "%lluM(%.*s),",
+				       size / MB, name_len, vte->name);
+		else if (size >= KB && size % KB == 0)
+			ret = snprintf(mtdparts + len, left, "%lluK(%.*s),",
+				       size / KB, name_len, vte->name);
 		else
 			return -1;
 
-		if (len < 0)
+		if (ret < 0 || ret >= left)
 			return -1;
 
-		if (left > len)
-			strcat(cmd, part);
-		else
-			return -1;
-
-		left -= len;
+		len += ret;
+		left -= ret;
 	}
 
-	return run_command(cmd, 0);
+	return env_set("mtdparts", mtdparts);
 }
 
 int syna_mtdparts_get_info_by_name(struct mtd_info *mtd, const char *name,
