@@ -84,7 +84,8 @@ TEEC_Result tee_register_ta(void *pta, size_t size)
 	comm = (struct tee_comm *)(uintptr_t)malloc_ion_noncacheable(sizeof(struct tee_comm));
 
 	if (!comm) {
-		printf("register_ta: no enough memory! %ld\n", sizeof(struct tee_comm));
+		printf("register_ta: no enough memory! %ld\n",
+		       (unsigned long)sizeof(struct tee_comm));
 		goto done;
 	}
 
