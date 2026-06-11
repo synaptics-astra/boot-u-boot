@@ -271,6 +271,18 @@ static void tw_init_mdio(void)
 	udelay(1);
 }
 
+static void init_sdio2_lpclk(void)
+{
+	u32 val;
+
+	val = readl(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl);
+
+	val |= BIT(LSb32Gbl_chipCntl_SDIO2_LPBK_CLK_EN) |
+		BIT(LSb32Gbl_chipCntl_SDIO2_LPBK_CLK_SEL);
+
+	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl);
+}
+
 int board_init(void)
 {
 	/* board related things like clock may be inited here */
@@ -279,6 +291,7 @@ int board_init(void)
 	set_drive_strength();
 	set_pin_status();
 	tw_init_mdio();
+	init_sdio2_lpclk();
 
 	return 0;
 }
