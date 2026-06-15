@@ -726,7 +726,7 @@ int diag_change_avpll(unsigned int apll_index, unsigned int freq, unsigned int s
 {
 	int ret = 0;
 
-	if (apll_index < 0 || apll_index > (APLL1 - VPLL0)) {
+	if (apll_index > (APLL1 - VPLL0)) {
 #if TARGET != BOOT
 		printf("INVALID input apll index!\n");
 #else

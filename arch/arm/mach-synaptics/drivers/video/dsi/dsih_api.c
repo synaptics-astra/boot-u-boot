@@ -1421,13 +1421,13 @@ int mipi_dsih_edpi_video(struct mipi_dsi_dev *dev)
 		 * 3:1| 8:2| 12:3| 16:5| 18:6| 24:7
 		 */
 		switch (video_params->color_coding) {
-		case 0:
-		case 1:
-		case 2:
+		case COLOR_CODE_16BIT_CONFIG1:
+		case COLOR_CODE_16BIT_CONFIG2:
+		case COLOR_CODE_16BIT_CONFIG3:
 			buf[1] = 5;
 			break;
-		case 3:
-		case 4:
+		case COLOR_CODE_18BIT_CONFIG1:
+		case COLOR_CODE_18BIT_CONFIG2:
 			buf[1] = 6;
 			break;
 		default:
