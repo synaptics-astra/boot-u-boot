@@ -63,9 +63,13 @@ int detect_randomized_blks(enum xspi_ops ops, u32 wbuf)
 	if (skip_randomized_blks == 0) {
 		if (ops == XSPI_READ) {
 			buff = malloc(VT_OFFSET_FROM_BOTTOM);
+			if (!buff)
+				return -1;
+
 			mtd = xspi_nand_init();
 			if (!mtd) {
 				printf("%s xspi nand init failed\n", __func__);
+				free(buff);
 				return -1;
 			}
 			loff_t start;
