@@ -23,6 +23,7 @@
  */
 #include <linux/types.h>
 #include <linux/compat.h>
+#include <linux/delay.h>
 #include <dm.h>
 #include <video.h>
 #include <backlight.h>
