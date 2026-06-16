@@ -657,7 +657,9 @@ static int setup_fdt_overlay(void *fdt)
 		if (!isalnum((unsigned char)*p) &&
 		    *p != '.' &&
 			*p != '_' &&
-			*p != '-')
+			*p != '-' &&
+			*p != ' ' &&
+			*p != ',')
 			return -EINVAL;
 	    p++;
 	}
