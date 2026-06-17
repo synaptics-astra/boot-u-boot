@@ -28,6 +28,215 @@
 #include <vsprintf.h>
 #include <linux/arm-smccc.h>
 
+/* ---- Lookup Table ---- */
+struct otp_field_entry  {
+	int value;
+	const char *name;
+};
+
+#define UNUSED(x) ((void)(x))
+
+#if IS_ENABLED(CONFIG_TARGET_KLAMATH)
+
+#define SYNA_SIP_SMC64_BCM_CMD	       0xC2000003
+
+#define SP_CMD_QUERY_SPK_VERSION       0x2000000
+#define SP_CMD_OTP_ACCESS              0x2000005
+
+#define OTP_ACCESS_READ		0
+#define OTP_ACCESS_WRITE	1
+
+enum OTP_FIELD_ID {
+	OTP_K0_OEM_HASH_0			= 80,	/* 16 x 4 bytes = 64 bytes */
+	OTP_K0_OEM_HASH_1			= 81,
+	OTP_K0_OEM_HASH_2			= 82,
+	OTP_K0_OEM_HASH_3			= 83,
+	OTP_K0_OEM_HASH_4			= 84,
+	OTP_K0_OEM_HASH_5			= 85,
+	OTP_K0_OEM_HASH_6			= 86,
+	OTP_K0_OEM_HASH_7			= 87,
+	OTP_K0_OEM_HASH_8			= 88,
+	OTP_K0_OEM_HASH_9			= 89,
+	OTP_K0_OEM_HASH_10			= 90,
+	OTP_K0_OEM_HASH_11			= 91,
+	OTP_K0_OEM_HASH_12			= 92,
+	OTP_K0_OEM_HASH_13			= 93,
+	OTP_K0_OEM_HASH_14			= 94,
+	OTP_K0_OEM_HASH_15			= 95,
+
+	OTP_CCGK_0				= 112,	/* 8 * 4 bytes */
+	OTP_CCGK_1				= 113,
+	OTP_CCGK_2				= 114,
+	OTP_CCGK_3				= 115,
+	OTP_CCGK_4				= 116,
+	OTP_CCGK_5				= 117,
+	OTP_CCGK_6				= 118,
+	OTP_CCGK_7				= 119,
+
+	OTP_CCUK_0				= 120,	/* 8 * 4 bytes */
+	OTP_CCUK_1				= 121,
+	OTP_CCUK_2				= 122,
+	OTP_CCUK_3				= 123,
+	OTP_CCUK_4				= 124,
+	OTP_CCUK_5				= 125,
+	OTP_CCUK_6				= 126,
+	OTP_CCUK_7				= 127,
+
+	OTP_CCUK_ID_0				= 128,	/* 2 * 4 bytes */
+	OTP_CCUK_ID_1				= 129,
+
+	OTP_OEM_IMAGE_SECURE_BOOT_ENABLE	= 131,	/* 1 * 4 bytes */
+	OTP_OEM_SEGID				= 135,	/* 1 * 4 bytes */
+	OTP_OEM_IMAGE_VERSION			= 145,	/* 1 * 4 bytes */
+
+	OTP_SOC_UID_0				= 556,	/* 4 * 4 bytes */
+	OTP_SOC_UID_1				= 557,
+	OTP_SOC_UID_2				= 558,
+	OTP_SOC_UID_3				= 559,
+
+	OTP_MAC_ADDRESS_0			= 577,	/* 1 * 4 bytes */
+	OTP_MAC_ADDRESS_1			= 578,	/* 1 * 4 bytes */
+
+	OTP_FIELD_MAX,
+};
+
+static const struct otp_field_entry  otp_field_table[] = {
+#define X(v) {v, #v}
+
+	X(OTP_K0_OEM_HASH_0), X(OTP_K0_OEM_HASH_1), X(OTP_K0_OEM_HASH_2), X(OTP_K0_OEM_HASH_3),
+	X(OTP_K0_OEM_HASH_4), X(OTP_K0_OEM_HASH_5), X(OTP_K0_OEM_HASH_6), X(OTP_K0_OEM_HASH_7),
+	X(OTP_K0_OEM_HASH_8), X(OTP_K0_OEM_HASH_9), X(OTP_K0_OEM_HASH_10), X(OTP_K0_OEM_HASH_11),
+	X(OTP_K0_OEM_HASH_12), X(OTP_K0_OEM_HASH_13), X(OTP_K0_OEM_HASH_14), X(OTP_K0_OEM_HASH_15),
+
+	X(OTP_CCGK_0), X(OTP_CCGK_1), X(OTP_CCGK_2), X(OTP_CCGK_3), X(OTP_CCGK_4), X(OTP_CCGK_5),
+	X(OTP_CCGK_6), X(OTP_CCGK_7),
+
+	X(OTP_CCUK_0), X(OTP_CCUK_1), X(OTP_CCUK_2), X(OTP_CCUK_3), X(OTP_CCUK_4), X(OTP_CCUK_5),
+	X(OTP_CCUK_6), X(OTP_CCUK_7),
+
+	X(OTP_CCUK_ID_0), X(OTP_CCUK_ID_1),
+
+	X(OTP_OEM_IMAGE_SECURE_BOOT_ENABLE), X(OTP_OEM_SEGID), X(OTP_OEM_IMAGE_VERSION),
+
+	X(OTP_SOC_UID_0), X(OTP_SOC_UID_1), X(OTP_SOC_UID_2), X(OTP_SOC_UID_3),
+
+	X(OTP_MAC_ADDRESS_0), X(OTP_MAC_ADDRESS_1)
+
+#undef X
+};
+
+static int do_otp_spk(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+		      SP_CMD_QUERY_SPK_VERSION,
+		      0, 0, 0, 0, 0, 0,
+		      &res);
+
+	printf("otp operation %s\n", res.a0 == 0 ? "succeed" : "failed");
+
+	printf("ret a0 = 0x%lx, ret a1 = 0x%lx, ret a2 = 0x%lx, ret a3 = 0x%lx\n",
+	       res.a0, res.a1, res.a2, res.a3);
+
+	return res.a0 == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
+/* ---- Dump Implementation ---- */
+static int do_otp_idx_dump(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	UNUSED(cmdtp);
+	UNUSED(flag);
+	UNUSED(argc);
+	UNUSED(argv);
+
+	printf("%-5s %-40s\n", "Idx", "Name");
+	printf("----------------------------------------------\n");
+	for (size_t i = 0; i < ARRAY_SIZE(otp_field_table); ++i)
+		printf("%-5d %s\n", otp_field_table[i].value, otp_field_table[i].name);
+
+	return CMD_RET_SUCCESS;
+}
+
+static int do_otp_read(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	u32 index;
+	struct arm_smccc_res res;
+
+	if (argc < 2)
+		return -1;
+
+	if (strncmp(argv[1], "0x", 2) == 0 || strncmp(argv[1], "0X", 2) == 0)
+		index = simple_strtoul(argv[1], NULL, 16);
+	else
+		index = simple_strtoul(argv[1], NULL, 10);
+
+	arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+		      SP_CMD_OTP_ACCESS,
+		      OTP_ACCESS_READ, index, 0, 0, 0, 0,
+		      &res);
+
+	printf("otp operation %s\n", res.a0 == 0 && res.a1 == 0 ? "succeed" : "failed");
+
+	if (res.a0 != 0) {
+		printf("res.a0 = 0x%08lx, res.a1 = 0x%08lx, res.a2 = 0x%08lx, res.a3 = 0x%08lx\n",
+		       res.a0, res.a1, res.a2, res.a3);
+	}
+
+	printf("read otp[%d] data=0x%08lx\n", index, res.a2);
+
+	return res.a0 == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
+static int do_otp_write(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	u32 index;
+	u32 data, mask;
+	struct arm_smccc_res res;
+
+	if (argc < 4)
+		return -1;
+
+	if (strncmp(argv[1], "0x", 2) == 0 || strncmp(argv[1], "0X", 2) == 0)
+		index = simple_strtoul(argv[1], NULL, 16);
+	else
+		index = simple_strtoul(argv[1], NULL, 10);
+
+	data = simple_strtoull(argv[2], NULL, 16);
+	mask = simple_strtoull(argv[3], NULL, 16);
+
+	flush_dcache_all();
+
+	debug("program otp[%d] data=0x%08x, mask=0x%08x\n", index, data, mask);
+
+	arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+		      SP_CMD_OTP_ACCESS,
+		      OTP_ACCESS_WRITE, index, data, mask, 0, 0,
+		      &res);
+
+	printf("otp operation %s\n", res.a0 == 0 && res.a1 == 0 ? "succeed" : "failed");
+
+	if (res.a0 != 0) {
+		printf("res.a0 = 0x%08lx, res.a1 = 0x%08lx, res.a2 = 0x%08lx, res.a3 = 0x%08lx\n",
+		       res.a0, res.a1, res.a2, res.a3);
+	}
+
+	return res.a0 == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
+static char otp_spk_help[] =
+	"\n"
+	"Read spk version\n"
+	;
+
+static char otp_spk_usage[] =
+	"\n"
+	"examples:\n"
+	"    otp_spk\n"
+	;
+
+#else /* !CONFIG_TARGET_KLAMATH */
+
 #define SYNA_SIP_SMC64_OTP_PROGRAM     0xC2000008
 #define SYNA_SIP_SMC64_OTP_READ_OTP    0xC200000A
 #define SYNA_SIP_SMC64_OTP_WRITE_OTP   0xC200000B
@@ -109,12 +318,6 @@ enum OTP_FIELD_ID {
 	OTP_TEE_SECURITY_ENABLE,	/* 1 bit (1 x uint32_t) */
 
 	OTP_FIELD_MAX
-};
-
-/* ---- Lookup Table ---- */
-struct otp_field_entry  {
-	int value;
-	const char *name;
 };
 
 static const struct otp_field_entry  otp_field_table[] = {
@@ -382,8 +585,6 @@ static int do_otp_read_public(struct cmd_tbl *cmdtp, int flag, int argc, char * 
 	return res.a0 == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
 }
 
-#define UNUSED(x) ((void)(x))
-
 /* ---- Dump Implementation ---- */
 static int do_otp_idx_dump(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
@@ -514,6 +715,8 @@ static char otp_pub_usage[] =
 	"    otp_pub\n"
 	;
 
+#endif
+
 static char otp_read_help[] =
 	"Read OTP data by otp_index.\n"
 	"    Use otp_idx_dump to see all otp_index values.\n";
@@ -558,8 +761,12 @@ static char otp_idx_dump_usage[] =
 	"Examples:\n"
 	"     otp_idx_dump\n";
 
+#if IS_ENABLED(CONFIG_TARGET_KLAMATH)
+U_BOOT_CMD(otp_spk, 1, 0, do_otp_spk, otp_spk_help, otp_spk_usage);
+#else
 U_BOOT_CMD(otp, 4, 0, do_otp, otp_help, otp_usage);
 U_BOOT_CMD(otp_pub, 1, 0, do_otp_read_public, otp_pub_help, otp_pub_usage);
+#endif
 U_BOOT_CMD(otpread, 2, 0, do_otp_read, otp_read_help, otp_read_usage);
 U_BOOT_CMD(otpwrite, 4, 0, do_otp_write, otp_write_help, otp_write_usage);
 U_BOOT_CMD(otp_idx_dump, 1, 0, do_otp_idx_dump, otp_idx_dump_help, otp_idx_dump_usage);
