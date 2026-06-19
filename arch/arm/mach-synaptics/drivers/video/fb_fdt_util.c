@@ -108,15 +108,6 @@ static int load_and_apply_dtbo(const char *dtbo_name, char *path,
 	if (!dtbo_name || !*dtbo_name)
 		return -EINVAL;
 
-	while (*p) {
-		if (!isalnum((unsigned char)*p) &&
-		    *p != '.' &&
-			*p != '_' &&
-			*p != '-')
-			return -EINVAL;
-	    p++;
-	}
-
 	/* Load DTBO from storage */
 	snprintf(cmd, sizeof(cmd), "ext4load mmc %s %p %s/%s",
 		 mmc_part, fdto_addr, path, dtbo_name);
@@ -214,6 +205,10 @@ int setup_uboot_fdt_overlay(void)
 	/* Try to process custom DTBOs from environment */
 	dtbo_env = env_get("dtbo");
 	if (dtbo_env && dtbo_env[0] != '\0') {
+		ret = is_valid_dtbo_string(dtbo_env);
+		if (ret)
+			goto cleanup;
+
 		/* Prepare FDT for overlay operations */
 		ret = prepare_fdt_overlay(blob, new_fdt);
 		if (ret)
@@ -287,6 +282,12 @@ static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 	if (!dtbo_env)
 		return 0;
 
+	ret = is_valid_dtbo_string(dtbo_env);
+	if (ret) {
+		printf("%s: dtbo string contains invalid character(s)\n", __func__);
+		return -1;
+	}
+
 	if (!path || !mmc_part) {
 		printf("%s: Path or mmc_part invalid\n", __func__);
 		return -1;
@@ -302,7 +303,7 @@ static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 	/* Process each DTBO token in the list */
 	while (tok) {
 		/* Check if this token has corresponding dtbo in filesystem */
-		int ret = is_file_exists(tok, path, mmc_part);
+		ret = is_file_exists(tok, path, mmc_part);
 
 		if (ret < 0) {
 			printf("File <%s> doesn't exist at path <%s>: %d\n", tok, path, ret);

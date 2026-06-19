@@ -680,16 +680,10 @@ static int setup_fdt_overlay(void *fdt)
 		return -ENOENT;
 	}
 
-	p = s;
-	while (*p) {
-		if (!isalnum((unsigned char)*p) &&
-		    *p != '.' &&
-			*p != '_' &&
-			*p != '-' &&
-			*p != ' ' &&
-			*p != ',')
-			return -EINVAL;
-	    p++;
+	ret = is_valid_dtbo_string(s);
+	if (ret) {
+		debug("dtbo string contains invalid character(s)\n");
+		return ret;
 	}
 
 	copy = malloc(strlen(s) + 1);

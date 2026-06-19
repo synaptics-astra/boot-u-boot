@@ -79,6 +79,8 @@ int get_fastlogo_addr(char *fl_args);
 void set_force_persistent_res_status(bool mode);
 bool get_force_persistent_res_status(void);
 
+int is_valid_dtbo_string(const char *s);
+
 #ifdef CONFIG_TARGET_KLAMATH
 int get_Klamath_leakage(void);
 int klamath_read_public_otp(struct KLAMATH_OTP_ITEMS *otp);

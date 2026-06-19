@@ -26,6 +26,7 @@
 #include <mmc.h>
 #include <env.h>
 #include <vsprintf.h>
+#include <linux/ctype.h>
 #include "Galois_memmap.h"
 #include "global.h"
 #include "misc_syna.h"
@@ -148,3 +149,20 @@ unsigned int get_max_malloc_size(void)
 	//don't hope to come here
 	return (max_size - (10 << 20));
 }
+
+int is_valid_dtbo_string(const char *s)
+{
+	while (*s) {
+		if (!isalnum((unsigned char)*s) &&
+		    *s != '.' &&
+			*s != '_' &&
+			*s != '-' &&
+			*s != ' ' &&
+			*s != ',')
+			return -EINVAL;
+	    s++;
+	}
+
+	return 0;
+}
+
