@@ -249,11 +249,11 @@ struct phy_pad_setting pad_setting_3v3[PHY_PAD_SETTING_NUM] = {
 
 #ifdef CONFIG_TARGET_PLATYPUS
 u8 phy_delay[MMC_MODES_END] = {
-	40,  /* MMC_LEGACY */
+	80,  /* MMC_LEGACY */
 	127, /* SD_LEGACY */
-	40,  /* MMC_HS */
+	80,  /* MMC_HS */
 	35,  /* SD_HS */
-	40,  /* MMC_HS_52 */
+	80,  /* MMC_HS_52 */
 	40,  /* MMC_DDR_52 */
 	100, /* UHS_SDR12 */
 	100, /* UHS_SDR25 */
@@ -268,11 +268,11 @@ u8 phy_delay[MMC_MODES_END] = {
 
 #ifdef CONFIG_TARGET_DOLPHIN
 u8 phy_delay[MMC_MODES_END] = {
-	40,  /* MMC_LEGACY */
+	80,  /* MMC_LEGACY */
 	127, /* SD_LEGACY */
-	40,  /* MMC_HS */
+	80,  /* MMC_HS */
 	35,  /* SD_HS */
-	40,  /* MMC_HS_52 */
+	80,  /* MMC_HS_52 */
 	40,  /* MMC_DDR_52 */
 	100, /* UHS_SDR12 */
 	100, /* UHS_SDR25 */
@@ -287,11 +287,11 @@ u8 phy_delay[MMC_MODES_END] = {
 
 #ifdef CONFIG_TARGET_MYNA2
 u8 phy_delay[MMC_MODES_END] = {
-	40,  /* MMC_LEGACY */
+	80,  /* MMC_LEGACY */
 	127, /* SD_LEGACY */
-	40,  /* MMC_HS */
+	80,  /* MMC_HS */
 	35,  /* SD_HS */
-	40,  /* MMC_HS_52 */
+	80,  /* MMC_HS_52 */
 	40,  /* MMC_DDR_52 */
 	100, /* UHS_SDR12 */
 	100, /* UHS_SDR25 */
@@ -306,11 +306,11 @@ u8 phy_delay[MMC_MODES_END] = {
 
 #ifdef CONFIG_TARGET_KLAMATH
 u8 phy_delay[MMC_MODES_END] = {
-	40,  /* MMC_LEGACY */
+	80,  /* MMC_LEGACY */
 	127, /* SD_LEGACY */
-	40,  /* MMC_HS */
+	80,  /* MMC_HS */
 	35,  /* SD_HS */
-	40,  /* MMC_HS_52 */
+	80,  /* MMC_HS_52 */
 	40,  /* MMC_DDR_52 */
 	100, /* UHS_SDR12 */
 	100, /* UHS_SDR25 */
