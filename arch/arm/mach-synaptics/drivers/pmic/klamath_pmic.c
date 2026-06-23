@@ -28,6 +28,10 @@
 #include "pmic.h"
 #include "misc_syna.h"
 
+#define KLAMATH_GRADE_CONSUMER		0x0
+#define KLAMATH_GRADE_INDUSTRIAL	0x2
+#define KLAMATH_PART_NUMBER_WORD	200
+
 struct leakage_conv_entry {
 	int leakage25_x10;
 	int leakage105_x10;
@@ -52,39 +56,86 @@ static const struct leakage_conv_entry leakage_conv_tbl[] = {
 	{ 0, 0 },
 };
 
-static struct leakage_table table_vcore_h[] = {
-	{	240,  900000},
-	{	400,  875000},
-	{	560,  850000},
-	{	700,  825000},
-	{	0xffff, 825000},
+static struct leakage_table table_vcore_h_consumer[] = {
+	{ 240, 900000 },
+	{ 400, 875000 },
+	{ 560, 850000 },
+	{ 700, 825000 },
+	{ 0xffff, 825000 },
 };
 
-static struct leakage_table table_vcore_l[] = {
-	{	240,  825000},
-	{	400,  800000},
-	{	560,  775000},
-	{	700,  750000},
-	{	0xffff, 750000},
+static struct leakage_table table_vcore_l_consumer[] = {
+	{ 240, 825000 },
+	{ 400, 800000 },
+	{ 560, 775000 },
+	{ 700, 750000 },
+	{ 0xffff, 750000 },
 };
 
-static struct freq_leakage_table l_table_vcore[] = {
-	//vl is at front and vh follows vl
-	{1700, table_vcore_l},
-	{2000, table_vcore_h},
-	{0, NULL},
+static struct leakage_table table_vcore_h_industrial[] = {
+	{ 240, 925000 },
+	{ 400, 900000 },
+	{ 560, 875000 },
+	{ 700, 850000 },
+	{ 0xffff, 850000 },
 };
 
-static struct freq_leakage_table *l_table_vcpu = l_table_vcore;
+static struct leakage_table table_vcore_l_industrial[] = {
+	{ 240, 850000 },
+	{ 400, 825000 },
+	{ 560, 800000 },
+	{ 700, 775000 },
+	{ 0xffff, 775000 },
+};
+
+static struct freq_leakage_table l_table_vcore_consumer[] = {
+	{1700, table_vcore_l_consumer },
+	{2000, table_vcore_h_consumer },
+	{0, NULL },
+};
+
+static struct freq_leakage_table l_table_vcore_industrial[] = {
+	{1700, table_vcore_l_industrial },
+	{2000, table_vcore_h_industrial },
+	{0, NULL },
+};
+
+static struct freq_leakage_table *l_table_vcore = l_table_vcore_industrial;
 
 struct freq_leakage_table *get_vcpu_leakage_table(void)
 {
-	return l_table_vcpu;
+	return l_table_vcore;
 }
 
 struct freq_leakage_table *get_vcore_leakage_table(void)
 {
 	return l_table_vcore;
+}
+
+static void klamath_select_leakage_table(struct KLAMATH_OTP_ITEMS *otp)
+{
+	u32 part_number;
+	u8 osat_info;
+	u8 grade;
+
+	part_number = otp->resv_0x0_0x324[KLAMATH_PART_NUMBER_WORD];
+	osat_info = (part_number >> 16) & 0xff;
+	grade = (osat_info >> 4) & 0x3;
+
+	switch (grade) {
+	case KLAMATH_GRADE_CONSUMER:
+		printf("  Grade: Consumer\n");
+		l_table_vcore = l_table_vcore_consumer;
+		break;
+	case KLAMATH_GRADE_INDUSTRIAL:
+		printf("  Grade: Industrial\n");
+		l_table_vcore = l_table_vcore_industrial;
+		break;
+	default:
+		printf("  Grade: unknown, use Industrial table\n");
+		l_table_vcore = l_table_vcore_industrial;
+		break;
+	}
 }
 
 static int calculate_leakage105_x10(int leakage25_x10)
@@ -129,6 +180,8 @@ int get_Klamath_leakage(void)
 		printf("failed to read public otp\n");
 		return -1;
 	}
+
+	klamath_select_leakage_table(&otp);
 
 	leakage25_x10 = otp.VDD_CORE_25C_SIDD;
 	leakage105_x10 = otp.VDD_CORE_105C_SIDD;
