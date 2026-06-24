@@ -294,7 +294,6 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 	struct mtd_info *mtd;
 	u64 max_alloc;
 
-	char img_name[512];
 	u32 align_size = 0;
 	u32 init_mode = 2;
 	u32 imgsize = 0;
@@ -400,11 +399,8 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 		snprintf(cmd, sizeof(cmd), "imgload %s %s 0x%p", srcstr[src],
 			 img_file, (void *)(u64)mem_addr);
 		ret = run_command(cmd, 0);
-	}
-
-	if (ret != 0) {
-		printf("%s: can not get image %s\n", __func__, img_name);
-		goto ERROR;
+		if (ret)
+			goto ERROR;
 	}
 
 	if (IS_ENABLED(CONFIG_NAND_RANDOMIZER)) {
