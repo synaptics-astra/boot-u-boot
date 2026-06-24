@@ -558,6 +558,32 @@ static void update_opp_vcore(void *fdt, unsigned int vcoreh, unsigned int vcorel
 	update_opp_node(fdt, offset, vcoreh, vcorel, vcoreh_freq);
 }
 
+static void update_opp_gpu(void *fdt, unsigned int vcoreh, unsigned int vcorel)
+{
+	int offset;
+
+	offset = fdt_path_offset(fdt, "/soc/gpu_opp_table");
+	if (offset < 0) {
+		debug("didn't find point of /soc/gpu_opp_table\n");
+		return;
+	}
+
+	update_opp_node(fdt, offset, vcoreh, vcorel, 0);
+}
+
+static void update_opp_npu(void *fdt, unsigned int vcoreh, unsigned int vcorel)
+{
+	int offset;
+
+	offset = fdt_path_offset(fdt, "/soc/npu_opp_table");
+	if (offset < 0) {
+		debug("didn't find point of /soc/npu_opp_table\n");
+		return;
+	}
+
+	update_opp_node(fdt, offset, vcoreh, vcorel, 0);
+}
+
 static int setup_opp(void *fdt)
 {
 	u32 opp[2];
@@ -579,9 +605,11 @@ static int setup_opp(void *fdt)
 	opp[1] = 0u;
 	flt = get_vcore_leakage_table();
 	ret = get_vh_vl(flt, leakage, opp);
-	if (ret == 0)
+	if (ret == 0) {
 		update_opp_vcore(fdt, opp[1], opp[0], get_vh_freq(flt));
-
+		update_opp_gpu(fdt, opp[1], opp[0]);
+		update_opp_npu(fdt, opp[1], opp[0]);
+	}
 	return 0;
 }
 
