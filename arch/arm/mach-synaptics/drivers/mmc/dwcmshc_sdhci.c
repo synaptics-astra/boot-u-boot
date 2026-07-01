@@ -525,7 +525,7 @@ static int dwcmshc_probe(struct udevice *dev)
 	plat->pad_sp = dev_read_u32_default(dev, "pad_sp", 0);
 	plat->dll_delay_offset = dev_read_u32_default(dev, "dll-delay-offset", 1000);
 
-	ret = sdhci_setup_cfg(&plat->cfg, host, plat->cfg.f_max, 0);
+	ret = sdhci_setup_cfg(&plat->cfg, host, host->max_clk, 400000);
 	if (ret)
 		return ret;
 
