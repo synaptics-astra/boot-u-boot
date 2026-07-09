@@ -29,6 +29,7 @@ config CMD_SYNA_SRAM_BUF
 	depends on SYNA_SUBOOT && TARGET_PLATYPUS
 
 config CMD_SYNA_MTDPARTS
+	default y
 	bool "Enable MTD parts in version table format"
 	depends on (SYNA_SPI_SUBOOT || SYNA_SPINAND_SUBOOT)
 
