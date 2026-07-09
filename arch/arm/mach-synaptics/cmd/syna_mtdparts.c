@@ -29,8 +29,9 @@
 #include "fastboot_syna.h"
 #include "spinand_drv.h"
 
-#define CMD_MTD_PARTS_LEN 512
-#define MTD_PART_LEN 64
+#define MTDPARTS_LEN 512
+#define MTDIDS_LEN 64
+
 #define KB 0x400
 #define MB 0x100000
 #define GB 0x40000000
@@ -43,6 +44,9 @@
 #define SPI_BOOT_PART_NUM 2
 
 #define NAND_PREBOOT_COPIES 8
+
+static char parts[MTDPARTS_LEN];
+static char ids[MTDIDS_LEN];
 
 struct ver_table_t {
 	int num;
@@ -200,8 +204,8 @@ static int valid_part_name(const char *name, int *name_len)
 
 static int get_mtd_parts(struct mtd_info *mtd)
 {
-	char mtdparts[CMD_MTD_PARTS_LEN];
-	u32 left = CMD_MTD_PARTS_LEN;
+	char mtdparts[MTDPARTS_LEN];
+	u32 left = MTDPARTS_LEN;
 	u32 len = 0;
 	u64 size;
 	struct ver_table_entry_t *vte;
@@ -243,7 +247,9 @@ static int get_mtd_parts(struct mtd_info *mtd)
 		left -= ret;
 	}
 
-	return env_set("mtdparts", mtdparts);
+	strlcpy(parts, mtdparts, MTDPARTS_LEN);
+
+	return 0;
 }
 
 int syna_mtdparts_get_info_by_name(struct mtd_info *mtd, const char *name,
@@ -292,6 +298,8 @@ int syna_init_mtdparts(void)
 	if (get_mtd_parts(mtd))
 		goto out;
 
+	env_set("mtdparts", parts);
+
 	ret = 0;
 
 out:
@@ -299,7 +307,47 @@ out:
 	return ret;
 }
 
-static int do_syna_mtdparts(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+void board_mtdparts_default(const char **mtdids, const char **mtdparts)
+{
+	struct mtd_info *mtd;
+	struct udevice *dev;
+	const char *mtd_partition;
+	static bool mtd_initialized;
+
+	if (mtd_initialized) {
+		*mtdids = ids;
+		*mtdparts = parts;
+		return;
+	}
+
+	memset(parts, 0, sizeof(parts));
+	memset(ids, 0, sizeof(ids));
+
+	if (IS_ENABLED(CONFIG_MTD_SPI_NAND))
+		mtd = xspi_nand_init();
+	else if (IS_ENABLED(CONFIG_SPI_FLASH_MTD))
+		/* setup spi device */
+		mtd = fb_spi_setup_mtd_dev();
+
+	if (IS_ERR_OR_NULL(mtd))
+		return;
+
+	if (get_partition_info(mtd))
+		return;
+
+	if (get_mtd_parts(mtd))
+		return;
+
+	mtd_initialized = true;
+	snprintf(ids, sizeof(ids), "%s=%s", mtd->name, mtd->name);
+	*mtdids = ids;
+	*mtdparts = parts;
+
+	env_set("mtdids", ids);
+	env_set("mtdparts", parts);
+}
+
+static int do_syna_mtdparts(struct cmd_tbl *cmdtp, int flag, int arc, char * const argv[])
 {
 	return syna_init_mtdparts();
 }
