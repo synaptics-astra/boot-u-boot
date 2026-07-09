@@ -328,10 +328,6 @@ int board_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_CMD_SYNA_MTDPARTS
-extern int syna_init_mtdparts(void);
-#endif
-
 int board_late_init(void)
 {
 	unsigned int result = 0;
@@ -343,10 +339,6 @@ int board_late_init(void)
 
 #ifdef CONFIG_SYNA_TZ_MR
 	get_mem_region_list_from_tz();
-#endif
-
-#ifdef CONFIG_CMD_SYNA_MTDPARTS
-	syna_init_mtdparts();
 #endif
 
 	return result;

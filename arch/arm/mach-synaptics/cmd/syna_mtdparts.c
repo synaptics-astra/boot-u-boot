@@ -277,36 +277,6 @@ int get_subimg_blks(int idx)
 	return vts.vt[idx].part1_blks;
 }
 
-int syna_init_mtdparts(void)
-{
-	struct mtd_info *mtd = NULL;
-	int ret = -1;
-
-	if (IS_ENABLED(CONFIG_MTD_SPI_NAND)) {
-		mtd = xspi_nand_init();
-	} else if (IS_ENABLED(CONFIG_SPI_FLASH_MTD)) {
-		/* setup spi device */
-		mtd = fb_spi_setup_mtd_dev();
-	}
-
-	if (IS_ERR_OR_NULL(mtd))
-		goto out;
-
-	if (get_partition_info(mtd))
-		goto out;
-
-	if (get_mtd_parts(mtd))
-		goto out;
-
-	env_set("mtdparts", parts);
-
-	ret = 0;
-
-out:
-
-	return ret;
-}
-
 void board_mtdparts_default(const char **mtdids, const char **mtdparts)
 {
 	struct mtd_info *mtd;
@@ -347,9 +317,13 @@ void board_mtdparts_default(const char **mtdids, const char **mtdparts)
 	env_set("mtdparts", parts);
 }
 
-static int do_syna_mtdparts(struct cmd_tbl *cmdtp, int flag, int arc, char * const argv[])
+static int do_syna_mtdparts(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
-	return syna_init_mtdparts();
+	const char *mtdids = NULL;
+	const char *mtdparts = NULL;
+
+	board_mtdparts_default(&mtdids, &mtdparts);
+	return 0;
 }
 
 U_BOOT_CMD(syna_mtdparts, 1, 0, do_syna_mtdparts,
