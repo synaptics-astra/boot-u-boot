@@ -134,10 +134,12 @@ static const char *get_mtdparts(void)
 	static char tmp_parts[MTDPARTS_MAXLEN];
 	const char *mtdparts = NULL;
 
-	if (gd->flags & GD_FLG_ENV_READY)
+	if (gd->flags & GD_FLG_ENV_READY) {
 		mtdparts = env_get("mtdparts");
-	else if (env_get_f("mtdparts", tmp_parts, sizeof(tmp_parts)) != -1)
-		mtdparts = tmp_parts;
+	} else if (env_get_f("mtdparts", tmp_parts, sizeof(tmp_parts)) != -1) {
+		if (!IS_ENABLED(CONFIG_ARCH_SYNAPTICS) || strlen(tmp_parts) > 0)
+			mtdparts = tmp_parts;
+	}
 
 	if (mtdparts)
 		return mtdparts;
