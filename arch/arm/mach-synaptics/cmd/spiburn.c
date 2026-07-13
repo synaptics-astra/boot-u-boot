@@ -54,7 +54,6 @@ static struct mtd_info *mtd;
 static struct burnpt_info g_pt_e[MAX_PT_NUM];
 static int g_pt_cnt;
 static int g_use_temp_pt;
-static int g_mtdparts_init;
 
 static int last_start_off = -1;
 
@@ -75,13 +74,15 @@ struct mtd_info *xspi_init(void)
 	struct udevice *new, *bus_dev;
 	int ret;
 
-	if (flash)
-		return mtd;
-
-	ret = spi_find_bus_and_cs(CONFIG_SF_DEFAULT_BUS,
-				  CONFIG_SF_DEFAULT_CS, &bus_dev, &new);
-	if (!ret)
-		device_remove(new, DM_REMOVE_NORMAL);
+	/* Refresh flash/mtd pointers if device already exists */
+	if (!spi_find_bus_and_cs(CONFIG_SF_DEFAULT_BUS,
+				 CONFIG_SF_DEFAULT_CS, &bus_dev, &new)) {
+		flash = dev_get_uclass_priv(new);
+		if (flash) {
+			mtd = &flash->mtd;
+			return mtd;
+		}
+	}
 
 	ret = spi_flash_probe_bus_cs(CONFIG_SF_DEFAULT_BUS,
 				     CONFIG_SF_DEFAULT_CS, &new);
@@ -101,27 +102,35 @@ struct mtd_info *xspi_init(void)
 
 static int xspi_erase(u32 start, u32 size)
 {
-	char cmd[128];
-
-	if (!xspi_init())
-		return -1;
-
-	snprintf(cmd, sizeof(cmd), "mtd erase %s 0x%x 0x%x", mtd->name, start, size);
-	return run_command(cmd, 0);
-}
-
-static int xspi_write(u32 start, u32 size, void *buff, int verify)
-{
-	char cmd[128];
 	int ret;
 
 	if (!xspi_init())
 		return -1;
 
-	snprintf(cmd, sizeof(cmd), "mtd write %s %p 0x%x 0x%x", mtd->name, buff, start, size);
-	ret = run_command(cmd, 0);
-	if (ret)
+	printf("Erasing 0x%x ... 0x%x (%d eraseblock(s))\n",
+	       start, start + size - 1, size / flash->erase_size);
+	ret = spi_flash_erase(flash, start, size);
+	if (ret) {
+		printf("SPI flash erase failed at 0x%x, size 0x%x (err=%d)\n",
+		       start, size, ret);
 		return ret;
+	}
+	return 0;
+}
+
+static int xspi_write(u32 start, u32 size, void *buff, int verify)
+{
+	int ret;
+
+	if (!xspi_init())
+		return -1;
+
+	ret = spi_flash_write(flash, start, size, buff);
+	if (ret) {
+		printf("SPI flash write failed at 0x%x, size 0x%x (err=%d)\n",
+		       start, size, ret);
+		return ret;
+	}
 
 	if (verify) {
 		void *rbuff = malloc_cache_aligned(IMAGE_ALIGNED);
@@ -135,10 +144,9 @@ static int xspi_write(u32 start, u32 size, void *buff, int verify)
 
 		while (rest > 0) {
 			rsize = (rest > IMAGE_ALIGNED) ? IMAGE_ALIGNED : rest;
-			size_t retlen;
 
-			if (mtd_read(mtd, rstart, rsize, &retlen, rbuff) || retlen != rsize) {
-				printf("MTD read verify fail at 0x%x\n", rstart);
+			if (spi_flash_read(flash, rstart, rsize, rbuff)) {
+				printf("SPI flash read verify fail at 0x%x\n", rstart);
 				free(rbuff);
 				return -EIO;
 			}
@@ -320,6 +328,21 @@ static int get_partition_info(const char *pt_name, struct burnpt_info *pi)
 				       pt_name);
 				return -1;
 			}
+			if (xspi_init()) {
+				if (g_pt_e[idx].start >= mtd->size) {
+					printf("Warning: Partition %s (start=0x%x) is beyond flash size 0x%llx, skipping\n",
+					       pt_name, g_pt_e[idx].start,
+					       (unsigned long long)mtd->size);
+					return -1;
+				}
+				if (g_pt_e[idx].start + g_pt_e[idx].size > mtd->size) {
+					u32 old_size = g_pt_e[idx].size;
+
+					g_pt_e[idx].size = mtd->size - g_pt_e[idx].start;
+					printf("Warning: Partition %s (%u bytes) exceeds flash size, truncating to %u bytes\n",
+					       pt_name, old_size, g_pt_e[idx].size);
+				}
+			}
 			*pi = g_pt_e[idx];
 			return 0;
 		}
@@ -330,19 +353,26 @@ static int get_partition_info(const char *pt_name, struct burnpt_info *pi)
 
 	struct mtd_info *m = NULL;
 
-	if (!mtd && !xspi_init())
+	if (!xspi_init())
 		return -1;
-	if (!g_mtdparts_init) {
-		if (syna_init_mtdparts() != 0) {
-			printf("ERROR: VT not found! Please perform a full burn (tftp2nor).\n");
-			return -1;
-		}
-		g_mtdparts_init = 1;
-	}
 
 	m = get_mtd_device_nm(pt_name);
 	if (IS_ERR_OR_NULL(m)) {
-		if (strncmp(pt_name, "mtd", 3) == 0) {
+		mtd_probe_devices();
+		m = get_mtd_device_nm(pt_name);
+	}
+	if (IS_ERR_OR_NULL(m)) {
+		int i;
+
+		for (i = 0; i < 32; i++) {
+			m = get_mtd_device(NULL, i);
+			if (IS_ERR_OR_NULL(m))
+				break;
+			if (strcmp(m->name, pt_name) == 0)
+				break;
+			m = NULL;
+		}
+		if (IS_ERR_OR_NULL(m) && strncmp(pt_name, "mtd", 3) == 0) {
 			int idx;
 
 			idx = simple_strtoul(pt_name + 3, NULL, 10);
@@ -351,9 +381,29 @@ static int get_partition_info(const char *pt_name, struct burnpt_info *pi)
 	}
 
 	if (!IS_ERR_OR_NULL(m)) {
+		u32 part_size = m->size;
+		struct mtd_info *dev = m->parent;
+
+		if (dev && m->offset + m->size > dev->size) {
+			if (m->offset >= dev->size) {
+				printf("Error: Partition %s is beyond device %s (size 0x%llx)\n",
+				       pt_name, dev->name, (unsigned long long)dev->size);
+				put_mtd_device(m);
+				return -1;
+			}
+			part_size = dev->size - m->offset;
+			printf("Warning: Partition %s beyond device %s, truncating to %llu bytes\n",
+			       pt_name, dev->name, (unsigned long long)part_size);
+		}
+		if (part_size == 0) {
+			printf("Error: Partition %s has zero size, skipping\n", pt_name);
+			put_mtd_device(m);
+			return -1;
+		}
 		strlcpy(pi->name, m->name, 32);
 		pi->start = m->offset;
-		pi->size = m->size;
+		pi->size = part_size;
+		put_mtd_device(m);
 		return 0;
 	}
 
@@ -396,7 +446,7 @@ static void get_image_path_and_name(char *str, char *path, char *name)
 		int len;
 
 		len = pname - str + 1;
-		strlcpy(path, str, len);
+		strlcpy(path, str, len + 1);
 		path[len] = '\0';
 		strcpy(name, (pname + 1));
 	}
@@ -410,14 +460,13 @@ static int dl_and_burn_img(char *src, char *path, char *imgname, char *pt,
 	void *buff, *buff_aligned, *head_backup = NULL, *tail_backup = NULL;
 	u32 image_size, alloc_size, blk_size, erase_start, erase_end, aligned_start, aligned_end;
 	int ret = -1;
-	size_t retlen;
 
 	if (get_partition_info(pt, &pi))
 		return -1;
 
 	print_img2mtd_msg(ptop_orig, path, src, pi);
 
-	if (!mtd && !xspi_init())
+	if (!xspi_init())
 		return -1;
 
 	alloc_size = pi.size + IMAGE_ALIGNED;
@@ -440,7 +489,7 @@ static int dl_and_burn_img(char *src, char *path, char *imgname, char *pt,
 	}
 	image_size = env_get_hex("filesize", 0);
 
-	blk_size = mtd->erasesize;
+	blk_size = flash->erase_size;
 	erase_start = pi.start;
 	erase_end = pi.start + pi.size;
 	aligned_start = (erase_start / blk_size) * blk_size;
@@ -453,16 +502,16 @@ static int dl_and_burn_img(char *src, char *path, char *imgname, char *pt,
 
 		if (erase_start % blk_size) {
 			head_backup = malloc_cache_aligned(blk_size);
-			if (mtd_read(mtd, aligned_start, blk_size, &retlen,
-				     head_backup) || retlen != blk_size) {
+			if (spi_flash_read(flash, aligned_start, blk_size,
+					   head_backup)) {
 				printf("Read head backup fail at 0x%x\n", aligned_start);
 				goto out;
 			}
 		}
 		if (erase_end % blk_size && aligned_end > erase_end) {
 			tail_backup = malloc_cache_aligned(blk_size);
-			if (mtd_read(mtd, aligned_end - blk_size, blk_size, &retlen,
-				     tail_backup) || retlen != blk_size) {
+			if (spi_flash_read(flash, aligned_end - blk_size, blk_size,
+					   tail_backup)) {
 				printf("Read tail backup fail at 0x%x\n", aligned_end - blk_size);
 				goto out;
 			}
@@ -623,15 +672,9 @@ static int do_list2nor(struct cmd_tbl *cmdtp, int flag, int argc, char * const a
 
 static int do_nor_part(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
-	if (!mtd && !xspi_init())
+	if (!xspi_init())
 		return -1;
-	if (!g_mtdparts_init) {
-		if (syna_init_mtdparts() != 0) {
-			printf("ERROR: VT not found!\n");
-			return -1;
-		}
-		g_mtdparts_init = 1;
-	}
+
 	run_command("mtd list", 0);
 	return 0;
 }
