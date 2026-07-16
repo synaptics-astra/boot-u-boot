@@ -23,6 +23,8 @@
  */
 
 #include <asm/io.h>
+#include <linux/kconfig.h>
+#include <mtd.h>
 #include "Galois_memmap.h"
 #include "global.h"
 #include "mem_init.h"
@@ -330,6 +332,8 @@ int board_init(void)
 int board_late_init(void)
 {
 	unsigned int result = 0;
+	const char *mtdids = NULL;
+	const char *mtdparts = NULL;
 
 #if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
 	setup_rescue_mode_gpio();
@@ -339,6 +343,9 @@ int board_late_init(void)
 #ifdef CONFIG_SYNA_TZ_MR
 	get_mem_region_list_from_tz();
 #endif
+
+	if (IS_ENABLED(CONFIG_MTD))
+		board_mtdparts_default(&mtdids, &mtdparts);
 
 	return result;
 }
