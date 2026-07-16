@@ -141,6 +141,14 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&i2c2_pmux>;
 	clock-frequency = <100000>;
+
+	dsi_bridge: lt9611@3b {
+		compatible = "syna-bridge,lt9611";
+		reg = <0x3b>;
+		status = "okay";
+		enable-gpio = <&expander0 1 0>;
+		reset-gpio = <&expander0 7 1>;
+	};
 };
 
 &sm_uart0 {
