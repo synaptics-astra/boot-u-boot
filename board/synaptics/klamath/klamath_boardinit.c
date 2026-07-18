@@ -344,8 +344,9 @@ int board_late_init(void)
 	get_mem_region_list_from_tz();
 #endif
 
-	if (IS_ENABLED(CONFIG_MTD))
-		board_mtdparts_default(&mtdids, &mtdparts);
+#ifdef CONFIG_CMD_SYNA_MTDPARTS
+	board_mtdparts_default(&mtdids, &mtdparts);
+#endif
 
 	return result;
 }
