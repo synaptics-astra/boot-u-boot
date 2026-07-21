@@ -567,7 +567,6 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 
 	switch (boot_type) {
 	case BOOT_TYPE_MMC:
-	case BOOT_TYPE_SPINAND:
 		ab_mode = get_current_slot();
 		if (ab_mode != BOOTSEL_A && ab_mode != BOOTSEL_B) {
 			printf("No bootable slots found for image loading, spinning...!!\n");
@@ -598,6 +597,10 @@ static int do_syna_boot(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 			goto out;
 
 		offset = simple_strtoul(argv[2], NULL, 16);
+		break;
+
+	case BOOT_TYPE_SPINAND:
+		ab_mode = BOOTSEL_A;
 		break;
 
 	default:
