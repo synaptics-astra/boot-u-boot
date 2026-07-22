@@ -345,7 +345,7 @@ static void setup_rootfs(char *bootargs)
 	const char *pt_ubifs = NULL;
 	char rootfs_cmdline[128];
 
-	pt_ubifs = get_current_slot() == BOOTSEL_A ? ROOTFS_A : ROOTFS_B;
+	pt_ubifs = ROOTFS_A;
 
 	snprintf(rootfs_cmdline, sizeof(rootfs_cmdline), ROOTFS_CONFIG_LINE, pt_ubifs);
 	strcat(bootargs, rootfs_cmdline);
