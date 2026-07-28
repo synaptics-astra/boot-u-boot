@@ -243,16 +243,11 @@ static int do_show_logo(struct cmd_tbl *cmdtp, int flag, int argc,
 		dm_gpio_set_value(&priv->bl_gpio, 1);
 
 	if (IS_ENABLED(CONFIG_VIDEO_BRIDGE)) {
-		ofnode bridge_ofnode = ofnode_path("/soc/drm/dsi_hdmi_lt9611_bridge");
-
-		if (ofnode_valid(bridge_ofnode) && ofnode_is_enabled(bridge_ofnode)) {
-			ret = uclass_get_device(UCLASS_VIDEO_BRIDGE, 0, &video_bridge);
-
-			if (!ret) {
-				video_bridge_attach(video_bridge);
-				if (IS_ENABLED(CONFIG_SYNA_DRM_BRIDGE_LT9611))
-					lt9611_bridge_modeset(video_bridge, &priv->video_mode);
-			}
+		ret = uclass_get_device(UCLASS_VIDEO_BRIDGE, 0, &video_bridge);
+		if (!ret) {
+			video_bridge_attach(video_bridge);
+			if (IS_ENABLED(CONFIG_SYNA_DRM_BRIDGE_LT9611))
+				lt9611_bridge_modeset(video_bridge, &priv->video_mode);
 		}
 	}
 
