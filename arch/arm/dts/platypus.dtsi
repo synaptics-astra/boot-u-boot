@@ -442,5 +442,9 @@
 				status = "disabled";
 			};
 		};
+
+		waveshare_panel: waveshare-panel {
+			status = "disabled";
+		};
 	};
 };
