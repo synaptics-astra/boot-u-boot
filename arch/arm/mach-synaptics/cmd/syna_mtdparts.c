@@ -139,7 +139,7 @@ static int get_partition_info(struct mtd_info *mtd)
 		goto out;
 
 	if (IS_ENABLED(CONFIG_MTD_SPI_NAND)) {
-		start = NAND_BLOCK0_SIZE + NAND_BOOT_PARTITION_SIZE - CLEAR_VT_SIZE;
+		start = mtd->erasesize + NAND_BOOT_PARTITION_SIZE - CLEAR_VT_SIZE;
 		boot_part_size = NAND_BOOT_PARTITION_SIZE;
 		boot_part = NAND_PREBOOT_COPIES;
 	} else if (IS_ENABLED(CONFIG_SPI_FLASH_MTD)) {

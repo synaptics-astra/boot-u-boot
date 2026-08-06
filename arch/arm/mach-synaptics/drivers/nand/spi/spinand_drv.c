@@ -74,7 +74,7 @@ int detect_randomized_blks(enum xspi_ops ops, u32 wbuf)
 			}
 			loff_t start;
 
-			start = NAND_BLOCK0_SIZE + NAND_BOOT_PARTITION_SIZE -
+			start = mtd->erasesize + NAND_BOOT_PARTITION_SIZE -
 				     VT_OFFSET_FROM_BOTTOM;
 
 			for (i = 1; i <= 8; i++) {
