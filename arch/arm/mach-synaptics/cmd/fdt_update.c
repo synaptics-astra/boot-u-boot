@@ -41,6 +41,7 @@
 #include "fastboot_syna.h"
 #include "misc_syna.h"
 #include "pmic.h"
+#include "version_table.h"
 
 #define BERLIN_HEAP_COMPATIBLE_NAME "syna,berlin-heaps"
 #define POOL_NUM "pool-num"
@@ -69,6 +70,7 @@ enum {
 	FDT_UPDATE_MAC = BIT(3),
 	FDT_UPDATE_OVERLAY = BIT(4),
 	FDT_UPDATE_CMA = BIT(5),
+	FDT_UPDATE_FSPART = BIT(6),
 };
 
 /* Add/Append various video related kernel command line params */
@@ -741,6 +743,95 @@ err:
 }
 #endif
 
+#ifdef CONFIG_MTD_SPI_NAND
+static int fspart_name_equal(const char *a, const char *b)
+{
+	while (*a && *b) {
+		if (*a == '-' || *a == '_') {
+			a++;
+			continue;
+		}
+		if (*b == '-' || *b == '_') {
+			b++;
+			continue;
+		}
+		if (*a != *b)
+			return 0;
+		a++;
+		b++;
+	}
+	while (*a == '-' || *a == '_')
+		a++;
+	while (*b == '-' || *b == '_')
+		b++;
+
+	return *a == '\0' && *b == '\0';
+}
+
+/*
+ * Rewrite the NAND partition nodes in the DTB (flash@0/spi-nand) to match
+ * the partition table parsed from the version table on flash, so that the
+ * kernel layout always follows nand.pt without editing the DTS.
+ */
+static int setup_nand_partitions(void *fdt)
+{
+	u32 erasesize, reg[2];
+	int flash_off, node, len, ret = 0;
+	int i, num;
+
+	erasesize = syna_mtd_partition_erasesize();
+	num = syna_mtd_partition_num();
+	if (num <= 0 || !erasesize) {
+		printf("nand partition info error, skipping\n");
+		return 0;
+	}
+
+	flash_off = fdt_node_offset_by_compatible(fdt, -1, "spi-nand");
+	if (flash_off < 0) {
+		printf("no spi-nand node in dtb, skipping\n");
+		return 0;
+	}
+
+	for (node = fdt_first_subnode(fdt, flash_off); node >= 0;
+	     node = fdt_next_subnode(fdt, node)) {
+		const char *label;
+		int matched = 0;
+
+		label = fdt_getprop(fdt, node, "label", &len);
+		if (!label)
+			continue;
+
+		for (i = 0; i < num; i++) {
+			char pname[PART_NAME_MAX_LEN + 1];
+			u32 start = 0, blks = 0;
+
+			if (syna_mtd_partition_by_index(i, pname, &start, &blks))
+				continue;
+
+			if (!fspart_name_equal(label, pname))
+				continue;
+
+			matched = 1;
+			reg[0] = cpu_to_fdt32(start * erasesize);
+			reg[1] = cpu_to_fdt32(blks * erasesize);
+			ret = fdt_setprop(fdt, node, "reg", reg, sizeof(reg));
+			if (ret) {
+				printf("failed to set partition %s\n", label);
+				return ret;
+			}
+			debug("dtb partition %s -> offset 0x%08x size 0x%08x\n",
+			      label, fdt32_to_cpu(reg[0]), fdt32_to_cpu(reg[1]));
+			break;
+		}
+
+		if (!matched)
+			printf("dtb partition %s not in version table\n", label);
+	}
+
+	return 0;
+}
+#endif
+
 int fdt_update(struct fdt_header *fdt)
 {
 	char *s = env_get("skip_fdt_update");
@@ -771,6 +862,11 @@ int fdt_update(struct fdt_header *fdt)
 
 	if (!(skip & FDT_UPDATE_CMA))
 		setup_cma(fdt);
+
+#ifdef CONFIG_MTD_SPI_NAND
+	if (!(skip & FDT_UPDATE_FSPART))
+		setup_nand_partitions(fdt);
+#endif
 
 	fdt_pack(fdt);
 

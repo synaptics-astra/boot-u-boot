@@ -93,5 +93,9 @@ static inline int get_Klamath_leakage(void)
 int syna_init_mtdparts(void);
 
 int otp_read_mac(u8 *enetaddr);
+int syna_mtd_partition_num(void);
+int syna_mtd_partition_by_index(int index, char *name, u32 *start_blkind,
+				u32 *num_blks);
+u32 syna_mtd_partition_erasesize(void);
 
 #endif

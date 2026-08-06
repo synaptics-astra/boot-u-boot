@@ -55,6 +55,7 @@ struct ver_table_t {
 };
 
 static struct ver_table_t vts;
+static u32 syna_mtd_erasesize;
 
 static void dump_version_entry(struct ver_table_entry_t *vte)
 {
@@ -291,6 +292,32 @@ int get_subimg_blks(int idx)
 	return vts.vt[idx].part1_blks;
 }
 
+int syna_mtd_partition_num(void)
+{
+	return vts.num;
+}
+
+int syna_mtd_partition_by_index(int index, char *name, u32 *start_blkind,
+				u32 *num_blks)
+{
+	if (index < 0 || index >= vts.num)
+		return -1;
+
+	if (name)
+		strcpy(name, vts.vt[index].name);
+	if (start_blkind)
+		*start_blkind = vts.vt[index].part1_start_blkind;
+	if (num_blks)
+		*num_blks = vts.vt[index].part1_blks;
+
+	return 0;
+}
+
+u32 syna_mtd_partition_erasesize(void)
+{
+	return syna_mtd_erasesize;
+}
+
 void board_mtdparts_default(const char **mtdids, const char **mtdparts)
 {
 	struct mtd_info *mtd;
@@ -313,6 +340,8 @@ void board_mtdparts_default(const char **mtdids, const char **mtdparts)
 
 	if (IS_ERR_OR_NULL(mtd))
 		return;
+
+	syna_mtd_erasesize = mtd->erasesize;
 
 	if (get_partition_info(mtd))
 		return;
