@@ -152,7 +152,21 @@ static int get_partition_info(struct mtd_info *mtd)
 	}
 
 	for (i = 0; i < boot_part; i++) {
-		ret = mtd_read(mtd, start + i * boot_part_size,
+		loff_t read_addr;
+
+		if (IS_ENABLED(CONFIG_TARGET_KLAMATH) &&
+		    IS_ENABLED(CONFIG_MTD_SPI_NAND) &&
+		    mtd->writesize == 4096) {
+			loff_t slot_start = mtd->erasesize + i * (NAND_BOOT_PARTITION_SIZE * 2);
+			loff_t logical_offset = NAND_BOOT_PARTITION_SIZE - CLEAR_VT_SIZE;
+			loff_t logical_page_index = logical_offset / 2048;
+			loff_t physical_offset = logical_page_index * mtd->writesize;
+
+			read_addr = slot_start + physical_offset;
+		} else
+			read_addr = start + i * boot_part_size;
+
+		ret = mtd_read(mtd, read_addr,
 			       CLEAR_VT_SIZE, &read, buff);
 		if (ret || read != CLEAR_VT_SIZE) {
 			debug("read partition info error\n");
