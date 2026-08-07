@@ -213,6 +213,131 @@ int do_nand_erase(u32 offset, u32 blks)
 	return 0;
 }
 
+static int legacy_layout_block_write(struct mtd_info *mtd,
+				     const char *buf, u32 size,
+				     u32 start_addr, u32 boundary,
+				     char skip_bad, int verify)
+{
+	u32 rw_size;
+	u32 retry = 0;
+	u32 verify_offset;
+	u32 logical_block_size = mtd->erasesize / 2;
+	u32 blks = size / logical_block_size;
+	u32 rw_offset = start_addr;
+	u32 bytes_left = size;
+	u32 block_page_start;
+	u32 write_offset;
+	int ret;
+	u32 i;
+
+	if (size % logical_block_size)
+		blks++;
+
+	for (i = 0; i < blks; i++) {
+		rw_size = bytes_left > logical_block_size ? logical_block_size : bytes_left;
+
+write_block:
+		if (skip_bad) {
+			while (mtd->_block_isbad(mtd, rw_offset)) {
+				printf("\nskip bad block at 0x%08x\n", rw_offset);
+				rw_offset += mtd->erasesize;
+				continue;
+			}
+			if (rw_offset >= boundary) {
+				printf("try write to 0x%x crossed the boundary, abort!\n",
+				       rw_offset);
+				return -1;
+			}
+		}
+
+		block_page_start = rw_offset / mtd->writesize;
+		write_offset = 0;
+		ret = 0;
+
+		while (write_offset < rw_size) {
+			u32 len = (rw_size - write_offset) > 2048 ?
+				2048 : (rw_size - write_offset);
+			size_t rw_size_out;
+
+			ret = mtd_write(mtd, (loff_t)(block_page_start +
+					(write_offset / 2048)) * mtd->writesize,
+					len, &rw_size_out, (const u_char *)(buf + write_offset));
+			if (ret || rw_size_out != len) {
+				printf("legacy layout mtd_write failed at physical page %u\n",
+				       block_page_start + (write_offset / 2048));
+				return ret;
+			}
+			write_offset += len;
+		}
+
+		// Verify
+		if (verify) {
+			verify_offset = 0;
+			retry = 0;
+
+			while (verify_offset < rw_size) {
+				u32 len = (rw_size - verify_offset) > 2048 ?
+					2048 : (rw_size - verify_offset);
+				u32 phys_page = block_page_start + (verify_offset / 2048);
+read_block:
+				ret = syna_spinand_read(phys_page * mtd->writesize,
+							mtd->writesize, (u32)(u64)blk_buf);
+				if (ret) {
+					if (retry++ < 3) {
+						printf("read failed at physical page %u\n",
+						       phys_page);
+						goto read_block;
+					} else {
+						ret = -1;
+						break;
+					}
+				}
+
+				if (memcmp(blk_buf, buf + verify_offset, len) != 0) {
+					if (retry++ < 3) {
+						printf("verify mismatch at physical page %u\n",
+						       phys_page);
+						goto read_block;
+					} else {
+						ret = -1;
+						break;
+					}
+				}
+				verify_offset += len;
+			}
+
+			if (ret != 0) {
+				if (skip_bad) {
+					printf("verify failed at physical block 0x%x, ",
+					       rw_offset);
+					printf("marking as bad...\n");
+					ret = mtd_block_markbad(mtd, rw_offset);
+					if (ret) {
+						printf("block (0x%x) marked as bad failed\n",
+						       rw_offset);
+						return -1;
+					}
+					rw_offset += mtd->erasesize;
+					goto write_block;
+				} else {
+					bytes_left -= rw_size;
+					buf += rw_size;
+					rw_offset += mtd->erasesize;
+					continue;
+				}
+			}
+		}
+
+		bytes_left -= rw_size;
+		buf += rw_size;
+		rw_offset += mtd->erasesize;
+		if (i % 32 == 0)
+			printf("\n");
+		printf("#");
+	}
+	return 0;
+}
+
 static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_buff, u32 buff_size,
 			      int verify)
 {
@@ -220,6 +345,13 @@ static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_bu
 	loff_t ret;
 	u32 block_size = g_block_size;
 	u32 boundary = 0;
+	struct mtd_info *mtd;
+
+	mtd = xspi_nand_init();
+	if (!mtd) {
+		printf("%s xspi nand init failed\n", __func__);
+		return -1;
+	}
 
 	if (img_hdr->size == 0)
 		return 0;
@@ -244,13 +376,32 @@ static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_bu
 			       img_hdr->name, (u32)img_hdr->size);
 			return -1;
 		}
+
+		u32 step_size = NAND_BOOT_PARTITION_SIZE;
+		u32 write_size = buff_size;
+		int use_legacy_layout = (mtd->writesize == 4096) &&
+					(IS_ENABLED(CONFIG_TARGET_KLAMATH));
+
+		if (use_legacy_layout)
+			step_size = write_size * 2;
+
 		for (i = img_hdr->chip_start_blkind * block_size;
 		     i < (img_hdr->chip_start_blkind + img_hdr->chip_num_blocks) * block_size;
-		     i = i + NAND_BOOT_PARTITION_SIZE) {
-			// the boundary of pre-bootloader is boot partitoin size
-			boundary = i + NAND_BOOT_PARTITION_SIZE;
-			if (!do_nand_write((u32)(u64)img_buff, i, boundary,
-					   buff_size, 0, 1)) {
+		     i = i + step_size) {
+			/* the boundary of pre-bootloader is boot partitoin size */
+			boundary = i + step_size;
+
+			int status;
+
+			if (use_legacy_layout) {
+				status = legacy_layout_block_write(mtd, img_buff, write_size,
+								   i, boundary, 0, 0);
+			} else {
+				status = do_nand_write((u32)(u64)img_buff, i, boundary,
+						       write_size, 0, 1);
+			}
+
+			if (status == 0) {
 				j++;
 				printf("###success %d\n", j);
 			} else {
@@ -267,10 +418,26 @@ static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_bu
 		start = (loff_t)img_hdr->chip_start_blkind * block_size;
 		end = (loff_t)(img_hdr->chip_start_blkind + img_hdr->chip_num_blocks) * block_size;
 
-		if (!strcmp((char *)img_hdr->name, BLOCK0))
-			ret = do_nand_write((u32)(u64)img_buff, start, end, buff_size, 0, 1);
-		else
-			ret = do_nand_write((u32)(u64)img_buff, start, end, buff_size, 1, 1);
+		int is_block0 = !strcmp((char *)img_hdr->name, BLOCK0);
+		int use_legacy_layout = IS_ENABLED(CONFIG_TARGET_KLAMATH) &&
+						(mtd->writesize == 4096) && is_block0;
+
+		if (use_legacy_layout) {
+			u32 write_size = buff_size;
+
+			if (!strcmp((char *)img_hdr->name, BLOCK0) &&
+			    write_size > mtd->erasesize / 2)
+				write_size = mtd->erasesize / 2;
+			ret = legacy_layout_block_write(mtd, img_buff, write_size,
+							start, end, 0, 0);
+		} else {
+			if (!strcmp((char *)img_hdr->name, BLOCK0))
+				ret = do_nand_write((u32)(u64)img_buff, start, end,
+						    buff_size, 0, 1);
+			else
+				ret = do_nand_write((u32)(u64)img_buff, start, end,
+						    buff_size, 1, 1);
+		}
 
 		if (ret != 0)
 			return -1;
