@@ -105,6 +105,8 @@ int do_nand_write(u32 addr,
 	u32 blks, rw_offset, rw_size;
 	u32 retry = 0;
 	struct mtd_info *mtd;
+	u32 bytes_left = size;
+	const char *buf = (const char *)(uintptr_t)addr;
 
 	mtd = xspi_nand_init();
 	if (!mtd) {
@@ -118,6 +120,8 @@ int do_nand_write(u32 addr,
 		blks++;
 	rw_offset = offset;
 	for (i = 0; i < blks; i++) {
+		rw_size = bytes_left > g_block_size ? g_block_size : bytes_left;
+write_block:
 		if (skip_bad) {
 			while (mtd->_block_isbad(mtd, rw_offset)) {
 				printf("\nskip bad block at 0x%08x\n", rw_offset);
@@ -131,44 +135,58 @@ int do_nand_write(u32 addr,
 			}
 		}
 
-		rw_size = size > g_block_size ? g_block_size : size;
-		ret = syna_spinand_write(rw_offset, rw_size,
-					 (u32)(u64)(addr + i * g_block_size));
+		ret = syna_spinand_write(rw_offset, rw_size, (u32)(u64)buf);
 		if (ret) {
-			printf("syna_spinand_write failed\n");
+			printf("syna_spinand_write failed at 0x%x\n", rw_offset);
 			return ret;
-		}
-
-		if (verify) {
+		} else if (verify) {
 read_block:
 			ret = syna_spinand_read(rw_offset, rw_size, (u32)(u64)blk_buf);
 			if (ret) {
-				printf("syna_spinand_read failed\n");
-				return ret;
+				if (retry++ < 3) {
+					printf("read failed at 0x%x, retry %u...\n",
+					       rw_offset, retry);
+					goto read_block;
+				}
+				ret = -1;
+			} else if (memcmp(buf, (void *)blk_buf, rw_size) != 0) {
+				if (retry++ < 3) {
+					printf("verify mismatch at 0x%x, retry %u...\n",
+					       rw_offset, retry);
+					goto read_block;
+				}
+				ret = -1;
 			}
 
-			if (memcmp((void *)(uintptr_t)addr + i * g_block_size,
-				   (void *)blk_buf, rw_size) != 0) {
-				if (retry++ < 3)
-					goto read_block;
-
-				printf("syna_nand write at 0x%x size %d failed\n",
-				       rw_offset, rw_size);
-
-				printf("mark block 0x%x as bad\n", rw_offset);
-				ret = mtd_block_markbad(mtd, i * g_block_size);
-				if (ret) {
-					printf("block(0x%x) marked as bad failed\n",
-					       i * g_block_size);
-					return 1;
+			if (ret != 0) {
+				if (skip_bad) {
+					printf("verify failed at physical block 0x%x, ",
+					       rw_offset);
+					printf("marking as bad...\n");
+					ret = mtd_block_markbad(mtd, rw_offset);
+					if (ret) {
+						printf("block (0x%x) marked as bad failed\n",
+						       rw_offset);
+						return -1;
+					}
+					rw_offset += g_block_size;
+					retry = 0;
+					goto write_block;
+				} else {
+					bytes_left -= rw_size;
+					buf += rw_size;
+					rw_offset += g_block_size;
+					retry = 0;
+					continue;
 				}
-				rw_offset += g_block_size;
-				retry = 0;
-				continue;
 			}
 		}
-		size -= rw_size;
+
+		bytes_left -= rw_size;
+		buf += rw_size;
 		rw_offset += g_block_size;
+		retry = 0;
+
 		// only used to show a progress bar
 		if (i % 32 == 0)
 			printf("\n");
@@ -398,7 +416,7 @@ static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_bu
 								   i, boundary, 0, 0);
 			} else {
 				status = do_nand_write((u32)(u64)img_buff, i, boundary,
-						       write_size, 0, 1);
+						       write_size, 0, 0);
 			}
 
 			if (status == 0) {
@@ -433,10 +451,10 @@ static int burn_sub_image_inc(struct sub_img_info_t *img_hdr, const char *img_bu
 		} else {
 			if (!strcmp((char *)img_hdr->name, BLOCK0))
 				ret = do_nand_write((u32)(u64)img_buff, start, end,
-						    buff_size, 0, 1);
+						    buff_size, 0, 0);
 			else
 				ret = do_nand_write((u32)(u64)img_buff, start, end,
-						    buff_size, 1, 1);
+						    buff_size, 1, verify);
 		}
 
 		if (ret != 0)
@@ -710,7 +728,7 @@ int do_list2nand(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 			align_size *= g_page_size;
 		}
 		printf("subimg size = %x, align size = %x\n", (u32)sub_img_hdr->size, align_size);
-		// verify = 0 for command syna_nand write has done the verify
+		verify = 1;
 		ret = burn_sub_image_inc(sub_img_hdr, sub_img_pos,
 					 align_size, verify);
 		if (ret != 0) {
