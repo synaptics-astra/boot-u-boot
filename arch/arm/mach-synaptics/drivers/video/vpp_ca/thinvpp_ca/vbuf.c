@@ -115,11 +115,7 @@ HRESULT create_vbuf_desc(VBUF_INFO **pDesc, UINT32 uiBufID)
 	VBUF_INFO *pVBufInfo = NULL;
 	HRESULT Ret = SUCCESS;
 
-#ifdef CONFIG_TRUSTZONE
-	pVBufInfo = (VBUF_INFO *)(uintptr_t)VPP_TZ_ALLOC(sizeof(VBUF_INFO));
-#else
-	pVBufInfo = (VBUF_INFO *)GaloisMalloc(sizeof(VBUF_INFO));
-#endif
+	pVBufInfo = (VBUF_INFO *)VPP_ALLOC(sizeof(VBUF_INFO));
 
 	if (!pVBufInfo) {
 		printf("GaloisMalloc fails");

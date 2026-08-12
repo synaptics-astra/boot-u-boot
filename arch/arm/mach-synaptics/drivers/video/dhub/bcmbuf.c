@@ -43,7 +43,7 @@ int bcmbuf_create(BCMBUF *pbcmbuf, int size, void *memlist)
 	if (!pbcmbuf || size <= 0)
 		return (BCMBUF_EBADPARAM);
 
-	pbcmbuf->head = GaloisMalloc(size);
+	pbcmbuf->head = VPP_ALLOC(size);
 	if (!pbcmbuf->head)
 		return BCMBUF_ENOMEM;
 

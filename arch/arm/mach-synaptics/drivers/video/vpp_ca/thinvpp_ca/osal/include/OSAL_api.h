@@ -48,10 +48,8 @@ typedef UINT32                  AMP_SHM_HANDLE;
 typedef char    CHAR;
 
 void GaloisInit(void);
-void *GaloisMalloc(unsigned int size);
 void *VPP_ALLOC(unsigned int  uiSize);
 void *VPP_ALLOC_ALLIGNED(unsigned int size, unsigned int alignment);
-void *VPP_TZ_ALLOC(unsigned int  uiSize);
 
 int VPP_GET_RSV_MEM_REGION(u64 *start, u64 *size);
 

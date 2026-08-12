@@ -40,46 +40,6 @@ void GaloisInit(void)
     /* do nothing */
 }
 
-void *GaloisMalloc(unsigned int size)
-{
-	if (size > 0) {
-		void *raw_ptr;
-		uintptr_t aligned_ptr;
-
-		if (size > (UINT_MAX - 32U))
-			return NULL;
-
-		raw_ptr = malloc_ion_noncacheable((int)(size + 32U));
-		if (!raw_ptr)
-			return NULL;
-
-		aligned_ptr = (((uintptr_t)raw_ptr + 31U) >> 5) << 5;
-
-		return (void *)aligned_ptr;
-	}
-	return NULL;
-}
-
-void *GMalloc(unsigned int size)
-{
-	if (size > 0) {
-		void *raw_ptr;
-		uintptr_t aligned_ptr;
-
-		if (size > (UINT_MAX - 32U))
-			return NULL;
-
-		raw_ptr = malloc_ion_noncacheable((int)(size + 32U));
-		if (!raw_ptr)
-			return NULL;
-
-		aligned_ptr = (((uintptr_t)raw_ptr + 31U) >> 5) << 5;
-
-		return (void *)aligned_ptr;
-	}
-	return NULL;
-}
-
 void *VPP_ALLOC(unsigned int uiSize)
 {
 	if (uiSize == 0 || uiSize > INT_MAX)
@@ -105,20 +65,6 @@ void *VPP_ALLOC_ALLIGNED(unsigned int size, unsigned int alignment)
 }
 
 /* #define VPP_ENABLE_USE_NonCache_For_Cached_Memory */
-void *VPP_TZ_ALLOC(unsigned int  uiSize)
-{
-	void *pPtr = NULL;
-
-	if (uiSize == 0 || uiSize > INT_MAX)
-		return NULL;
-
-#ifdef VPP_ENABLE_TZ_MALLOC_MEM_ALLOCATION
-	pPtr = malloc_ion_cacheable(uiSize);
-#else
-	pPtr = GMalloc(uiSize);
-#endif
-	return pPtr;
-}
 
 /**
  * VPP_GET_RSV_MEM_REGION - Get VPP reserved memory region information
