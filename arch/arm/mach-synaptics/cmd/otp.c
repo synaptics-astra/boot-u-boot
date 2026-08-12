@@ -125,6 +125,37 @@ static const struct otp_field_entry  otp_field_table[] = {
 #undef X
 };
 
+int otp_read_mac(u8 *enetaddr)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+		      SP_CMD_OTP_ACCESS,
+		      OTP_ACCESS_READ, OTP_MAC_ADDRESS_1, 0, 0, 0, 0,
+		      &res);
+
+	if (res.a0 != 0)
+		return -1;
+
+	enetaddr[0] = (res.a2 & 0xff00) >> 8;
+	enetaddr[1] = res.a2 & 0xff;
+
+	arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+		      SP_CMD_OTP_ACCESS,
+		      OTP_ACCESS_READ, OTP_MAC_ADDRESS_0, 0, 0, 0, 0,
+		      &res);
+
+	if (res.a0 != 0)
+		return -1;
+
+	enetaddr[2] = (res.a2 & 0xff000000) >> 24;
+	enetaddr[3] = (res.a2 & 0xff0000) >> 16;
+	enetaddr[4] = (res.a2 & 0xff00) >> 8;
+	enetaddr[5] = res.a2 & 0xff;
+
+	return 0;
+}
+
 static int do_otp_spk(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
 {
 	struct arm_smccc_res res;
@@ -385,6 +416,11 @@ struct PUBLIC_OTP_ITEMS {
 	unsigned int   BOOT_VERSION;
 	unsigned int   JTAGProtectionLevel;
 };
+
+int otp_read_mac(u8 *enetaddr)
+{
+	return -1;
+}
 
 static void printPublicOtp(const struct PUBLIC_OTP_ITEMS *otp)
 {

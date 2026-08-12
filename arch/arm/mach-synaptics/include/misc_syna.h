@@ -92,4 +92,6 @@ static inline int get_Klamath_leakage(void)
 #endif
 int syna_init_mtdparts(void);
 
+int otp_read_mac(u8 *enetaddr);
+
 #endif

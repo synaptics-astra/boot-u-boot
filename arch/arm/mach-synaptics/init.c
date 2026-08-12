@@ -80,6 +80,9 @@ int get_fe_bgs(void)
 
 int get_mac(u8 *enetaddr)
 {
+	if (IS_ENABLED(CONFIG_TARGET_KLAMATH))
+		return otp_read_mac(enetaddr);
+
 	if (enetaddr && param2_save != 0xFFFFFFFF)
 		memcpy(enetaddr, ((struct bl_boot_arg *)param2_save)->mac_addr, ARP_HLEN);
 
