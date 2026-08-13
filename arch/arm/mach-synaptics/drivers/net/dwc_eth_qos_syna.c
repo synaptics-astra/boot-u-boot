@@ -43,6 +43,7 @@
 #include <linux/delay.h>
 
 #include "dwc_eth_qos.h"
+#include "misc_syna.h"
 
 static int eqos_start_resets_syna(struct udevice *dev)
 {
@@ -147,9 +148,17 @@ static int eqos_remove_resources_syna(struct udevice *dev)
 
 static int eqos_get_enetaddr_syna(struct udevice *dev)
 {
+	struct eth_pdata *plat = dev_get_plat(dev);
+
 	debug("%s(dev=%p):\n", __func__, dev);
 
-	/* reserved */
+	if (!IS_ENABLED(CONFIG_ETH_ROM_MAC))
+		return 0;
+
+	if (!plat)
+		return -ENOSYS;
+
+	get_mac(plat->enetaddr);
 
 	debug("%s: OK\n", __func__);
 	return 0;
