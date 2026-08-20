@@ -47,6 +47,9 @@ struct otp_field_entry  {
 #define OTP_ACCESS_WRITE	1
 
 enum OTP_FIELD_ID {
+	OTP_SYNA_IMAGE_SECURE_BOOT_ENABLE	= 44,	/* 1 * 4 bytes */
+	OTP_JTAG_ACCESS_CONTROL			= 72,	/* 1 * 4 bytes */
+
 	OTP_K0_OEM_HASH_0			= 80,	/* 16 x 4 bytes = 64 bytes */
 	OTP_K0_OEM_HASH_1			= 81,
 	OTP_K0_OEM_HASH_2			= 82,
@@ -102,6 +105,7 @@ enum OTP_FIELD_ID {
 
 static const struct otp_field_entry  otp_field_table[] = {
 #define X(v) {v, #v}
+	X(OTP_SYNA_IMAGE_SECURE_BOOT_ENABLE), X(OTP_JTAG_ACCESS_CONTROL),
 
 	X(OTP_K0_OEM_HASH_0), X(OTP_K0_OEM_HASH_1), X(OTP_K0_OEM_HASH_2), X(OTP_K0_OEM_HASH_3),
 	X(OTP_K0_OEM_HASH_4), X(OTP_K0_OEM_HASH_5), X(OTP_K0_OEM_HASH_6), X(OTP_K0_OEM_HASH_7),
