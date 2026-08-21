@@ -31,6 +31,8 @@
 #include "mem_init.h"
 
 #ifdef CONFIG_SYNA_RESCUE_MODE
+#include <asm/gpio.h>
+#include <command.h>
 #define GPIO_RESCUE_SET     48   // GPIO39 / PortB16
 #define GPIO_RESCUE_DETECT  47   // GPIO38 / PortB15
 #endif

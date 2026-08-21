@@ -24,6 +24,7 @@
 
 #include <asm/io.h>
 #include <linux/arm-smccc.h>
+#include <string.h>
 
 #include "misc_syna.h"
 

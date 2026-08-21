@@ -40,6 +40,8 @@
 #define  EPHY_SHUTDOWN		BIT(1)
 
 #ifdef CONFIG_SYNA_RESCUE_MODE
+#include <asm/gpio.h>
+#include <command.h>
 #define GPIO_RESCUE_SET     79   // GPIO39 / PortB7
 #define GPIO_RESCUE_DETECT  78   // GPIO38 / PortB6
 #endif

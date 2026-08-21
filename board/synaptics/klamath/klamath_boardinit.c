@@ -34,6 +34,8 @@
 // Check GPIO30/PortA30
 // GPIO group gpio@44_ not existed for nand, so 78 for nand and 86 for emmc
 #if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
+#include <asm/gpio.h>
+#include <command.h>
 #if (IS_ENABLED(CONFIG_CMD_SYNA_SPINAND_BURNING))
 #define GPIO_RESCUE_DETECT  78
 #else
