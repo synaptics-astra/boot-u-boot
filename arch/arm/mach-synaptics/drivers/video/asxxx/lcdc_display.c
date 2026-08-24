@@ -27,7 +27,9 @@
 #include <malloc.h>
 #include "includes.h"
 #include "dsih_api.h"
+#include "dphy_wrap.h"
 #include "hal_dhub.h"
+#include "avio_dhub_cfg_prv.h"
 #include "vpp_api.h"
 #include "vpp_priv.h"
 #include "dsih_displays.h"

@@ -671,7 +671,7 @@ static int setup_fdt_overlay(void *fdt)
 {
 	void *fdto_addr = NULL;
 	char cmd[512];
-	char *s, *p, *tok, *copy = NULL;
+	char *s, *tok, *copy = NULL;
 	int part_index, ret = 0;
 
 	s = env_get("dtbo");

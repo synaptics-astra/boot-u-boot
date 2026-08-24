@@ -376,9 +376,9 @@ static void set_drive_strength(void)
 			break;
 		}
 
-		val = readl(MEMMAP_CHIP_CTRL_REG_BASE + offset);
+		val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 		val |= drv;
-		writel(val, MEMMAP_CHIP_CTRL_REG_BASE + offset);
+		writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 	}
 
 	for (offset = RA_smSysCtl_SM_TW3_SCLCntl;
@@ -392,9 +392,9 @@ static void set_drive_strength(void)
 			continue;
 		}
 
-		val = readl(SOC_SM_SYS_CTRL_REG_BASE + offset);
+		val = readl((void __iomem *)(uintptr_t)(SOC_SM_SYS_CTRL_REG_BASE + offset));
 		val |= drv;
-		writel(val, SOC_SM_SYS_CTRL_REG_BASE + offset);
+		writel(val, (void __iomem *)(uintptr_t)(SOC_SM_SYS_CTRL_REG_BASE + offset));
 	}
 }
 
@@ -453,8 +453,10 @@ extern int syna_init_sm(void);
 int board_late_init(void)
 {
 	unsigned int result = 0;
+#ifdef CONFIG_CMD_SYNA_MTDPARTS
 	const char *mtdids = NULL;
 	const char *mtdparts = NULL;
+#endif
 
 #ifdef CONFIG_SYNA_RESCUE_MODE
 	setup_rescue_mode_gpio();

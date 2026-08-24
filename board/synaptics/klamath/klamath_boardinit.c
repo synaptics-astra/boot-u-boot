@@ -226,10 +226,10 @@ static void set_drive_strength(void)
 			break;
 		}
 
-		val = readl(MEMMAP_CHIP_CTRL_REG_BASE + offset);
+		val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 		val &= ~0xfUL;
 		val |= drv;
-		writel(val, MEMMAP_CHIP_CTRL_REG_BASE + offset);
+		writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 	}
 
 	/* SM, total 41 pads, all are 4bits.
@@ -242,10 +242,10 @@ static void set_drive_strength(void)
 		    offset == RA_mcu_gbl_cfg_SM_XTAL_ICntl)
 			continue;
 
-		val = readl(SOC_SM_SYS_CTRL_REG_BASE + offset);
+		val = readl((void __iomem *)(uintptr_t)(SOC_SM_SYS_CTRL_REG_BASE + offset));
 		val &= ~0xfUL;
 		val |= 7;
-		writel(val, SOC_SM_SYS_CTRL_REG_BASE + offset);
+		writel(val, (void __iomem *)(uintptr_t)(SOC_SM_SYS_CTRL_REG_BASE + offset));
 	}
 }
 
@@ -258,9 +258,9 @@ static void set_pin_status(void)
 		switch (offset) {
 		case RA_Gbl_GPIO48Cntl ... RA_Gbl_GPIO51Cntl: /* RGMII2 */
 		case RA_Gbl_GPIO57Cntl ... RA_Gbl_GPIO58Cntl: /* RGMII2 */
-			val = readl(MEMMAP_CHIP_CTRL_REG_BASE + offset);
+			val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 			val &= ~0x10UL;
-			writel(val, MEMMAP_CHIP_CTRL_REG_BASE + offset);
+			writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + offset));
 			break;
 
 		default:
@@ -269,9 +269,9 @@ static void set_pin_status(void)
 	}
 
 	/* disable PE bit for SDIO2 CLK */
-	val = readl(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl);
+	val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl));
 	val &= ~0x20UL;
-	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl);
+	writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_GPIO21Cntl));
 }
 
 static void tw_init_mdio(void)
@@ -279,9 +279,9 @@ static void tw_init_mdio(void)
 	u32 val;
 
 	/* set to RGMII1 MDIO */
-	val = readl(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_PERIF + RA_PERIF_TW_PORT_CTRL);
+	val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_PERIF + RA_PERIF_TW_PORT_CTRL));
 	val |=  (1 << LSb32PERIF_TW_PORT_CTRL_RGMII_MDIO_MDC_SEL);
-	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_PERIF + RA_PERIF_TW_PORT_CTRL);
+	writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_PERIF + RA_PERIF_TW_PORT_CTRL));
 	udelay(1);
 }
 
@@ -289,12 +289,12 @@ static void init_sdio2_lpclk(void)
 {
 	u32 val;
 
-	val = readl(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl);
+	val = readl((void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl));
 
 	val |= BIT(LSb32Gbl_chipCntl_SDIO2_LPBK_CLK_EN) |
 		BIT(LSb32Gbl_chipCntl_SDIO2_LPBK_CLK_SEL);
 
-	writel(val, MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl);
+	writel(val, (void __iomem *)(uintptr_t)(MEMMAP_CHIP_CTRL_REG_BASE + RA_Gbl_chipCntl));
 }
 
 #if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
@@ -334,8 +334,10 @@ int board_init(void)
 int board_late_init(void)
 {
 	unsigned int result = 0;
+#ifdef CONFIG_CMD_SYNA_MTDPARTS
 	const char *mtdids = NULL;
 	const char *mtdparts = NULL;
+#endif
 
 #if (IS_ENABLED(CONFIG_SYNA_RESCUE_MODE))
 	setup_rescue_mode_gpio();

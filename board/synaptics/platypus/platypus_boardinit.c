@@ -346,8 +346,10 @@ extern int syna_init_sm(void);
 int board_late_init(void)
 {
 	unsigned int result = 0;
+#ifdef CONFIG_CMD_SYNA_MTDPARTS
 	const char *mtdids = NULL;
 	const char *mtdparts = NULL;
+#endif
 
 #ifdef CONFIG_SYNA_RESCUE_MODE
 	setup_rescue_mode_gpio();

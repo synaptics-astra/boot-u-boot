@@ -103,7 +103,6 @@ static int load_and_apply_dtbo(const char *dtbo_name, char *path,
 {
 	char cmd[MAX_BUF_SIZE];
 	int ret;
-	const char *p = dtbo_name;
 
 	if (!dtbo_name || !*dtbo_name)
 		return -EINVAL;
@@ -313,8 +312,7 @@ static int verify_dtbo_env(const char *dtbo_env, char *path, char *mmc_part)
 
 		if (ret < 0) {
 			printf("File <%s> doesn't exist at path <%s>: %d\n", tok, path, ret);
-			free(copy);
-			return ret;
+			goto out;
 		}
 
 		tok = strtok(NULL, " ,");

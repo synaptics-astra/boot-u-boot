@@ -280,8 +280,6 @@ int get_subimg_blks(int idx)
 void board_mtdparts_default(const char **mtdids, const char **mtdparts)
 {
 	struct mtd_info *mtd;
-	struct udevice *dev;
-	const char *mtd_partition;
 	static bool mtd_initialized;
 
 	if (mtd_initialized) {
