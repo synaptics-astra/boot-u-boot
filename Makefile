@@ -630,6 +630,10 @@ u-boot.cfg spl/u-boot.cfg tpl/u-boot.cfg vpl/u-boot.cfg:
 -include include/autoconf.mk
 -include include/autoconf.mk.dep
 
+ifdef CONFIG_CC_WERROR
+KBUILD_CFLAGS   += -Werror
+endif
+
 # We want to include arch/$(ARCH)/config.mk only when include/config/auto.conf
 # is up-to-date. When we switch to a different board configuration, old CONFIG
 # macros are still remaining in include/config/auto.conf. Without the following

@@ -72,6 +72,11 @@ config CLANG_VERSION
 	int
 	default $(shell,$(srctree)/scripts/clang-version.sh $(CC))
 
+config CC_WERROR
+	bool "Treat compiler warnings as errors"
+	help
+	  Pass -Werror when compiling U-Boot target code.
+
 choice
 	prompt "Optimization level"
 	default CC_OPTIMIZE_FOR_SIZE
