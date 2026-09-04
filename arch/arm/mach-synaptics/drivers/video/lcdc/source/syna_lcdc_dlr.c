@@ -101,7 +101,7 @@ static void syna_lcdc_dlr_start2DDMA(struct syna_lcdc_dev *dev, VBUF_INFO *pinfo
 	stride = (width_byte * 16U + 15U) / 16U; /* 16-byte alignment */
 
 	if (dev->bcm_enable) {
-		if (!CURR_VBI_DMA_CFGQ || !CURR_VBI_DMA_CFGQ->addr) {
+		if (!CURR_VBI_DMA_CFGQ->addr) {
 			printf("invalid DMA cfgQ\n");
 			return;
 		}
@@ -251,7 +251,7 @@ static void syna_lcdc_dlr_mergebuf(struct syna_lcdc_dev *dev)
 	}
 
 	if (dev->bcm_enable) {
-		if (!CURR_VBI_DMA_CFGQ || !CURR_VBI_DMA_CFGQ->addr) {
+		if (!CURR_VBI_DMA_CFGQ->addr) {
 			printf("invalid DMA cfgQ\n");
 			return;
 		}
@@ -289,7 +289,7 @@ static void syna_lcdc_dlr_commitbuf(struct syna_lcdc_dev *dev, int use_vbi)
 
 	if (!dev->bcm_enable)
 		return;
-	if (!CURR_VBI_BCM_CFGQ || !CURR_VBI_BCM_CFGQ->addr) {
+	if (!CURR_VBI_BCM_CFGQ->addr) {
 		printf("invalid BCM cfgQ\n");
 		return;
 	}
