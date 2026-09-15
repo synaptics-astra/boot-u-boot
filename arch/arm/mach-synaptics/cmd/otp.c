@@ -213,7 +213,7 @@ static int do_otp_read(struct cmd_tbl *cmdtp, int flag, int argc, char * const a
 
 	printf("otp operation %s\n", res.a0 == 0 && res.a1 == 0 ? "succeed" : "failed");
 
-	if (res.a0 != 0) {
+	if (res.a0 != 0 || res.a1 != 0) {
 		printf("res.a0 = 0x%08lx, res.a1 = 0x%08lx, res.a2 = 0x%08lx, res.a3 = 0x%08lx\n",
 		       res.a0, res.a1, res.a2, res.a3);
 	}
@@ -251,12 +251,37 @@ static int do_otp_write(struct cmd_tbl *cmdtp, int flag, int argc, char * const 
 
 	printf("otp operation %s\n", res.a0 == 0 && res.a1 == 0 ? "succeed" : "failed");
 
-	if (res.a0 != 0) {
+	if (res.a0 != 0 || res.a1 != 0) {
 		printf("res.a0 = 0x%08lx, res.a1 = 0x%08lx, res.a2 = 0x%08lx, res.a3 = 0x%08lx\n",
 		       res.a0, res.a1, res.a2, res.a3);
 	}
 
 	return res.a0 == 0 ? CMD_RET_SUCCESS : CMD_RET_FAILURE;
+}
+
+static int do_otp_data_dump(struct cmd_tbl *cmdtp, int flag, int argc, char * const argv[])
+{
+	struct arm_smccc_res res;
+	u32 index;
+
+	UNUSED(cmdtp);
+	UNUSED(flag);
+	UNUSED(argc);
+	UNUSED(argv);
+
+	printf("%-5s %-40s\n", "Idx", "Name");
+	printf("-----------------------------------------------------\n");
+	for (size_t i = 0; i < ARRAY_SIZE(otp_field_table); ++i) {
+		index = otp_field_table[i].value;
+		arm_smccc_smc(SYNA_SIP_SMC64_BCM_CMD,
+			      SP_CMD_OTP_ACCESS,
+			      OTP_ACCESS_READ, index, 0, 0, 0, 0,
+			      &res);
+		printf("%-5d 0x%08lx  %s\n", otp_field_table[i].value, res.a2,
+		       otp_field_table[i].name);
+	}
+
+	return CMD_RET_SUCCESS;
 }
 
 static char otp_spk_help[] =
@@ -269,6 +294,14 @@ static char otp_spk_usage[] =
 	"examples:\n"
 	"    otp_spk\n"
 	;
+
+static char otp_data_dump_help[] =
+	"Dump all OTP field data.";
+
+static char otp_data_dump_usage[] =
+	"\n"
+	"Examples:\n"
+	"     otpdump.\n";
 
 #else /* !CONFIG_TARGET_KLAMATH */
 
@@ -803,6 +836,7 @@ static char otp_idx_dump_usage[] =
 
 #if IS_ENABLED(CONFIG_TARGET_KLAMATH)
 U_BOOT_CMD(otp_spk, 1, 0, do_otp_spk, otp_spk_help, otp_spk_usage);
+U_BOOT_CMD(otpdump, 1, 0, do_otp_data_dump, otp_data_dump_help, otp_data_dump_usage);
 #else
 U_BOOT_CMD(otp, 4, 0, do_otp, otp_help, otp_usage);
 U_BOOT_CMD(otp_pub, 1, 0, do_otp_read_public, otp_pub_help, otp_pub_usage);
