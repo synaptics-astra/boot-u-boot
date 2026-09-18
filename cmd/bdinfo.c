@@ -19,6 +19,7 @@
 #include <asm/cache.h>
 #include <asm/global_data.h>
 #include <display_options.h>
+#include <dm/uclass-internal.h>
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -45,19 +46,24 @@ void bdinfo_print_num_ll(const char *name, unsigned long long value)
 
 static void print_eth(void)
 {
-	const int idx = eth_get_dev_index();
+	struct udevice *dev = NULL;
 	uchar enetaddr[6];
 	char name[10];
+	int idx = -1;
 	int ret;
 
-	if (idx)
+	if (!uclass_find_first_device(UCLASS_ETH, &dev) && dev &&
+	    device_active(dev))
+		idx = dev_seq(dev);
+
+	if (idx > 0)
 		sprintf(name, "eth%iaddr", idx);
 	else
 		strcpy(name, "ethaddr");
 
-	ret = eth_env_get_enetaddr_by_index("eth", idx, enetaddr);
+	ret = idx >= 0 ? eth_env_get_enetaddr_by_index("eth", idx, enetaddr) : 0;
 
-	printf("current eth = %s\n", eth_get_name());
+	printf("current eth = %s\n", idx >= 0 ? dev->name : "unknown");
 	if (!ret)
 		printf("%-12s= (not set)\n", name);
 	else
